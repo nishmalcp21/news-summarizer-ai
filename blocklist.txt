@@ -1,0 +1,13 @@
+# Blocklist of excluded news domains (one per line)
+# Scraper sites, content farms, and untrusted sources
+buzzfeed.com
+dailymail.co.uk
+thesun.co.uk
+nationalenquirer.com
+infowars.com
+breitbart.com
+clickbaitnews.com
+contentfarm.net
+newsaggregator.xyz
+spamnews.org
+

@@ -1,0 +1,16 @@
+# Vague topic stoplist words (case-insensitive, matched as exact phrases or single words)
+news
+latest
+today
+update
+updates
+trending
+current events
+world news
+daily news
+top news
+breaking news
+info
+stuff
+everything
+
