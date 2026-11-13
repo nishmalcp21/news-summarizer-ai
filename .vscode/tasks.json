@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Authenticate Git with GitHub",
+			"type": "shell",
+			"command": "C:\\Program Files\\Git\\cmd\\git.exe",
+			"args": [
+				"credential-manager",
+				"github",
+				"login"
+			],
+			"isBackground": false
+		}
+	]
+}
