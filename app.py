@@ -181,48 +181,48 @@ def inject_claude_styling():
 
     if theme_type == "dark":
         palette = {
-            "background_color": "#262624",
-            "secondary_background_color": "#30302E",
-            "surface_color": "#30302E",
-            "text_color": "#ECEAE3",
-            "text_secondary": "#A3A19A",
-            "subtitle_color": "#A3A19A",
-            "label_color": "#A3A19A",
-            "placeholder_color": "#8A8984",
-            "border_color": "#3E3D3A",
-            "bubble_user": "#3A3936",
-            "primary_color": "#D97757",
-            "accent_hover": "#E58B6D",
-            "focus_ring": "rgba(217, 119, 87, 0.35)",
-            "button_text": "#ECEAE3",
+            "background_color": "#0B1220",
+            "secondary_background_color": "#101A2D",
+            "surface_color": "#131D33",
+            "text_color": "#E8EEF9",
+            "text_secondary": "#A7B4CA",
+            "subtitle_color": "#A7B4CA",
+            "label_color": "#9EACC3",
+            "placeholder_color": "#78869E",
+            "border_color": "#263550",
+            "bubble_user": "#1B2942",
+            "primary_color": "#4F8CFF",
+            "accent_hover": "#79A8FF",
+            "focus_ring": "rgba(79, 140, 255, 0.35)",
+            "button_text": "#E8EEF9",
             "primary_btn_text": "#FFFFFF",
-            "code_bg": "#1F1E1D",
-            "shadow_soft": "none",
+            "code_bg": "#0E172A",
+            "shadow_soft": "0 8px 24px rgba(0, 0, 0, 0.22)",
         }
     else:
         palette = {
-            "background_color": "#FAF9F5",
-            "secondary_background_color": "#F3F1EA",
+            "background_color": "#F5F8FF",
+            "secondary_background_color": "#EEF3FC",
             "surface_color": "#FFFFFF",
-            "text_color": "#1F1E1D",
-            "text_secondary": "#5F5E5A",
-            "subtitle_color": "#5F5E5A",
-            "label_color": "#6B6A66",
-            "placeholder_color": "#8A8984",
-            "border_color": "#E5E2D9",
-            "bubble_user": "#EFECE3",
-            "primary_color": "#C96442",
-            "accent_hover": "#B5573A",
-            "focus_ring": "rgba(201, 100, 66, 0.25)",
-            "button_text": "#1F1E1D",
+            "text_color": "#152238",
+            "text_secondary": "#54657F",
+            "subtitle_color": "#54657F",
+            "label_color": "#536680",
+            "placeholder_color": "#73839B",
+            "border_color": "#DCE5F2",
+            "bubble_user": "#E8F0FF",
+            "primary_color": "#2563EB",
+            "accent_hover": "#1D4ED8",
+            "focus_ring": "rgba(37, 99, 235, 0.22)",
+            "button_text": "#152238",
             "primary_btn_text": "#FFFFFF",
-            "code_bg": "#F3F1EA",
-            "shadow_soft": "0 1px 3px rgba(0, 0, 0, 0.06)",
+            "code_bg": "#F2F6FC",
+            "shadow_soft": "0 8px 24px rgba(19, 46, 89, 0.06)",
         }
 
     css = """
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
 
         :root {
             --background-color: __background_color__;
@@ -257,27 +257,43 @@ def inject_claude_styling():
             transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
+        body, .stApp, [data-testid="stAppViewContainer"] {
+            background-color: var(--background-color) !important;
+            color: var(--text-color) !important;
+        }
+        [data-testid="stHeader"] {
+            background-color: var(--background-color) !important;
+        }
+        [data-testid="stToolbar"] {
+            background-color: transparent !important;
+        }
+        h1, h2, h3, h4, h5, h6,
+        .greeting-title, .story-title {
+            font-family: 'Playfair Display', Georgia, serif !important;
+            color: var(--text-color);
+        }
 
-        /* Main chat column: max-width 760px, centered, generous spacing */
+        /* Main dashboard column with generous spacing */
         .block-container {
-            max-width: 760px !important;
-            padding-top: 1.5rem !important;
-            padding-bottom: 7rem !important;
-            padding-left: 1.5rem !important;
-            padding-right: 1.5rem !important;
+            max-width: 1120px !important;
+            padding-top: 2rem !important;
+            padding-bottom: 8rem !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
             margin: 0 auto !important;
         }
 
         /* Sidebar layout & theme */
         [data-testid="stSidebar"] {
+            background-color: var(--secondary-background-color) !important;
             border-right: 1px solid var(--border-color) !important;
         }
 
         [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
-            padding-top: 1.5rem;
-            padding-bottom: 2rem;
-            padding-left: 1rem;
-            padding-right: 1rem;
+            padding-top: 1.75rem;
+            padding-bottom: 2.25rem;
+            padding-left: 1.1rem;
+            padding-right: 1.1rem;
         }
 
         /* Section Labels ("Recent Chats", "Trending Presets") */
@@ -296,31 +312,31 @@ def inject_claude_styling():
         /* Centered Empty State Greeting */
         .empty-state {
             text-align: center;
-            padding: 40px 16px 20px;
-            margin-bottom: 24px;
+            padding: 56px 20px 32px;
+            margin-bottom: 32px;
         }
         .greeting-title {
-            font-size: 30px !important;
-            font-weight: 600 !important;
-            letter-spacing: -0.02em !important;
+            font-size: 42px !important;
+            font-weight: 700 !important;
+            letter-spacing: -0.03em !important;
             color: var(--text-color) !important;
             opacity: 1 !important;
-            margin-bottom: 10px !important;
+            margin-bottom: 14px !important;
         }
         .greeting-sub {
-            font-size: 15.5px !important;
+            font-size: 16px !important;
             color: var(--subtitle-color) !important;
             opacity: 1 !important;
             max-width: 520px !important;
-            margin: 0 auto 28px !important;
-            line-height: 1.5 !important;
+            margin: 0 auto 36px !important;
+            line-height: 1.65 !important;
         }
 
         /* All Secondary Buttons: Presets, Sidebar Recent Chats, Ratings */
         .stButton > button:not([kind="primary"]) {
             background-color: var(--surface-color) !important;
             border: 1px solid var(--border-color) !important;
-            border-radius: 10px !important;
+            border-radius: 12px !important;
             font-weight: 500 !important;
             font-size: 13.5px !important;
             color: var(--button-text) !important;
@@ -398,16 +414,16 @@ def inject_claude_styling():
         [data-testid="stExpander"] {
             background-color: var(--surface-color) !important;
             border: 1px solid var(--border-color) !important;
-            border-radius: 10px !important;
+            border-radius: 14px !important;
             box-shadow: var(--shadow-soft) !important;
         }
         [data-testid="stExpander"] details {
             background-color: var(--surface-color) !important;
-            border-radius: 10px !important;
+            border-radius: 14px !important;
         }
         [data-testid="stExpander"] summary {
             background-color: var(--surface-color) !important;
-            border-radius: 10px !important;
+            border-radius: 14px !important;
         }
         [data-testid="stExpander"] summary * {
             color: var(--text-color) !important;
@@ -422,7 +438,7 @@ def inject_claude_styling():
         [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
             background-color: var(--surface-color) !important;
             border-top: 1px solid var(--border-color) !important;
-            border-radius: 0 0 10px 10px !important;
+            border-radius: 0 0 14px 14px !important;
         }
         [data-testid="stExpander"] [data-testid="stExpanderDetails"] * {
             color: var(--text-color) !important;
@@ -445,14 +461,28 @@ def inject_claude_styling():
             color: var(--text-color) !important;
         }
 
-        /* Fixed Bottom Chat Input Styling */
+        .stApp,
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"],
+        [data-testid="stHeader"],
+        [data-testid="stToolbar"],
+        [data-testid="stBottom"],
+        [data-testid="stBottom"] > div,
         [data-testid="stBottomBlockContainer"] {
-            background-color: transparent !important;
+            background-color: var(--background-color) !important;
+        }
+
+        /* Fixed Bottom Chat Input Styling */
+        [data-testid="stBottom"] {
+            background-color: var(--background-color) !important;
+        }
+        [data-testid="stBottomBlockContainer"] {
+            background-color: var(--background-color) !important;
         }
         [data-testid="stChatInput"] {
             background-color: var(--surface-color) !important;
             border: 1px solid var(--border-color) !important;
-            border-radius: 22px !important;
+            border-radius: 18px !important;
             box-shadow: var(--shadow-soft) !important;
             padding: 6px 12px !important;
             outline: none !important;
@@ -501,7 +531,7 @@ def inject_claude_styling():
             background-color: var(--bubble-user) !important;
             color: var(--text-color) !important;
             padding: 12px 20px !important;
-            border-radius: 18px 18px 4px 18px !important;
+            border-radius: 18px 18px 6px 18px !important;
             max-width: 82% !important;
             font-size: 15px !important;
             line-height: 1.55 !important;
@@ -523,7 +553,8 @@ def inject_claude_styling():
         .agent-reply-body h3, 
         .agent-reply-body h4 {
             color: var(--text-color);
-            font-weight: 600;
+            font-family: 'Playfair Display', Georgia, serif;
+            font-weight: 700;
             margin-top: 24px;
             margin-bottom: 12px;
             opacity: 1;
@@ -547,22 +578,25 @@ def inject_claude_styling():
         .news-card {
             background-color: var(--surface-color) !important;
             border: 1px solid var(--border-color) !important;
-            border-radius: 12px !important;
-            padding: 18px 22px !important;
-            margin-bottom: 16px !important;
+            border-radius: 16px !important;
+            padding: 24px 26px !important;
+            margin-bottom: 20px !important;
             box-shadow: var(--shadow-soft) !important;
-            transition: border-color 150ms ease !important;
+            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease !important;
         }
         .news-card:hover {
             border-color: var(--primary-color) !important;
+            box-shadow: 0 14px 30px rgba(19, 46, 89, 0.12) !important;
+            transform: translateY(-2px);
         }
         .story-title {
             color: var(--text-color) !important;
-            font-size: 17px !important;
-            font-weight: 600 !important;
-            margin-top: 8px !important;
-            margin-bottom: 8px !important;
-            line-height: 1.4 !important;
+            font-family: 'Playfair Display', Georgia, serif !important;
+            font-size: 20px !important;
+            font-weight: 700 !important;
+            margin-top: 10px !important;
+            margin-bottom: 10px !important;
+            line-height: 1.38 !important;
             opacity: 1 !important;
         }
         .story-summary {
@@ -573,9 +607,9 @@ def inject_claude_styling():
         }
         .badge-source {
             background-color: var(--secondary-background-color) !important;
-            color: var(--primary-color) !important;
+            color: var(--text-secondary) !important;
             font-weight: 600 !important;
-            padding: 3px 10px !important;
+            padding: 4px 10px !important;
             border-radius: 9999px !important;
             font-size: 12px !important;
             border: 1px solid var(--border-color) !important;
@@ -585,7 +619,7 @@ def inject_claude_styling():
         .badge-date {
             background-color: var(--secondary-background-color) !important;
             color: var(--text-secondary) !important;
-            padding: 3px 10px !important;
+            padding: 4px 10px !important;
             border-radius: 9999px !important;
             font-size: 12px !important;
             border: 1px solid var(--border-color) !important;
@@ -595,9 +629,9 @@ def inject_claude_styling():
         }
         .badge-theme {
             background-color: var(--secondary-background-color) !important;
-            color: var(--primary-color) !important;
+            color: var(--text-secondary) !important;
             font-weight: 600 !important;
-            padding: 3px 10px !important;
+            padding: 4px 10px !important;
             border-radius: 9999px !important;
             font-size: 12px !important;
             border: 1px solid var(--border-color) !important;
@@ -612,36 +646,37 @@ def inject_claude_styling():
             border-top: 1px solid var(--border-color) !important;
             border-right: 1px solid var(--border-color) !important;
             border-bottom: 1px solid var(--border-color) !important;
-            border-radius: 10px !important;
-            padding: 18px 22px !important;
-            margin-bottom: 24px !important;
+            border-radius: 16px !important;
+            padding: 22px 26px !important;
+            margin-bottom: 28px !important;
             box-shadow: var(--shadow-soft) !important;
         }
         .quick-summary-title {
+            font-family: 'Playfair Display', Georgia, serif !important;
             font-weight: 600 !important;
-            font-size: 14.5px !important;
-            margin-bottom: 6px !important;
+            font-size: 17px !important;
+            margin-bottom: 9px !important;
             color: var(--primary-color) !important;
             opacity: 1 !important;
         }
         .quick-summary-text {
-            font-size: 15px !important;
-            line-height: 1.6 !important;
+            font-size: 15.5px !important;
+            line-height: 1.7 !important;
             color: var(--text-color) !important;
             opacity: 1 !important;
         }
 
         /* Tabs: clearly readable in both Light and Dark themes */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 8px !important;
+            gap: 12px !important;
             background-color: transparent !important;
             border-bottom: 1px solid var(--border-color) !important;
         }
         .stTabs [data-baseweb="tab"] {
             background-color: transparent !important;
             border: none !important;
-            padding: 8px 16px !important;
-            border-radius: 6px 6px 0 0 !important;
+            padding: 10px 18px !important;
+            border-radius: 8px 8px 0 0 !important;
         }
         .stTabs [data-baseweb="tab"] * {
             color: var(--text-secondary) !important;
@@ -702,7 +737,7 @@ def inject_claude_styling():
             text-align: left;
             background-color: var(--surface-color);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
         }
         .claude-table th {
@@ -742,14 +777,17 @@ def inject_claude_styling():
         /* Responsive design */
         @media (max-width: 768px) {
             .block-container {
-                padding-left: 1rem !important;
-                padding-right: 1rem !important;
+                padding-left: 1.1rem !important;
+                padding-right: 1.1rem !important;
             }
             .user-msg-bubble {
                 max-width: 95%;
             }
             .greeting-title {
-                font-size: 24px !important;
+                font-size: 32px !important;
+            }
+            .news-card {
+                padding: 20px !important;
             }
         }
     </style>
