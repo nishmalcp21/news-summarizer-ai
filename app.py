@@ -784,7 +784,7 @@ def main():
                 "Story Target Count",
                 min_value=3,
                 max_value=10,
-                value=5,
+                value=3,
                 help="Number of verified stories in final digest (PRD range: 3-10)."
             )
 
