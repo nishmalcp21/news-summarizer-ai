@@ -852,7 +852,7 @@ def main():
             mode = st.radio(
                 "Search & LLM Provider",
                 ["Offline Mock (Fast / Zero Token Cost)", "Live API (Tavily + LiteLLM)"],
-                index=0
+                index=1
             )
 
             time_range = st.selectbox(
