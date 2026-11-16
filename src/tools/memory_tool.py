@@ -22,7 +22,10 @@ class PersistentMemoryStore:
         if self.filepath.exists():
             try:
                 with open(self.filepath, "r", encoding="utf-8") as f:
-                    self._data = json.load(f)
+                    loaded = json.load(f)
+                if not isinstance(loaded, dict):
+                    raise ValueError("Memory file must contain a JSON object")
+                self._data = loaded
             except Exception as e:
                 logger.log_error(0, "manage_memory", f"Failed to load memory file: {e}")
                 self._data = {"history": [], "cache": {}}
@@ -83,7 +86,7 @@ class PersistentMemoryStore:
 
     def clear_history(self) -> None:
         self._load()
-        self._data["history"] = []
+        self._data = {"history": [], "cache": {}}
         self._save()
 
     def delete_topic_history(self, topic: str) -> None:

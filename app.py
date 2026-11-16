@@ -41,45 +41,19 @@ from src.memory import PersistentMemory
 from src.tools.memory_tool import manage_memory as _manage_memory
 
 
-# ---------------------------------------------------------------------------
-# Direct JSON memory helpers — immune to Streamlit module-cache stale state
-# ---------------------------------------------------------------------------
-def _memory_file_path() -> Path:
-    return PROJECT_ROOT / "memory" / "memory.json"
-
-def _load_memory_data() -> dict:
-    p = _memory_file_path()
-    if p.exists():
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {"history": [], "cache": {}}
-
-def _save_memory_data(data: dict) -> None:
-    p = _memory_file_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with open(p, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
 def _clear_all_history() -> None:
-    data = _load_memory_data()
-    data["history"] = []
-    _save_memory_data(data)
+    PersistentMemory().clear_history()
+    st.session_state["current_digest"] = None
+    st.session_state["current_stories"] = []
+    st.session_state["current_topic"] = ""
+    st.session_state["search_input"] = ""
+    st.session_state["trigger_search"] = False
+    st.session_state["chat_messages"] = []
+    st.session_state["recent_chats"] = []
+    st.rerun()
 
 def _delete_topic_history(topic: str) -> None:
-    data = _load_memory_data()
-    clean = topic.strip().lower()
-    data["history"] = [
-        h for h in data.get("history", [])
-        if h.get("topic", "").strip().lower() != clean
-    ]
-    data["cache"] = {
-        k: v for k, v in data.get("cache", {}).items()
-        if not k.startswith(f"{clean}::")
-    }
-    _save_memory_data(data)
+    PersistentMemory().delete_topic_history(topic)
 
 
 # ---------------------------------------------------------------------------
@@ -727,6 +701,10 @@ def main():
         st.session_state["search_input"] = ""
     if "trigger_search" not in st.session_state:
         st.session_state["trigger_search"] = False
+    if "chat_messages" not in st.session_state:
+        st.session_state["chat_messages"] = []
+    if "recent_chats" not in st.session_state:
+        st.session_state["recent_chats"] = []
 
     # -----------------------------------------------------------------------
     # Left Sidebar: New chat button + Recents + Settings (Collapsible)
@@ -736,6 +714,7 @@ def main():
         if st.button("＋ Start new chat", use_container_width=True, type="primary"):
             st.session_state["current_digest"] = None
             st.session_state["current_topic"] = ""
+            st.session_state["chat_messages"] = []
             st.session_state["search_input"] = ""
             st.session_state["trigger_search"] = False
             st.rerun()
@@ -749,9 +728,6 @@ def main():
         with clr_col:
             if st.button("🗑️ All", key="clear_all_history", help="Clear all chat history"):
                 _clear_all_history()
-                st.session_state["current_digest"] = None
-                st.session_state["current_topic"] = ""
-                st.rerun()
 
         pm = PersistentMemory()
         history_records = pm.get_history()
@@ -764,6 +740,7 @@ def main():
                     recent_topics.append(top)
                 if len(recent_topics) >= 5:
                     break
+        st.session_state["recent_chats"] = recent_topics
 
         if recent_topics:
             for top in recent_topics:
@@ -780,6 +757,7 @@ def main():
                         if st.session_state.get("current_topic", "") == top:
                             st.session_state["current_digest"] = None
                             st.session_state["current_topic"] = ""
+                            st.session_state["chat_messages"] = []
                         st.rerun()
         else:
             st.caption("No past chats yet.")
@@ -953,6 +931,10 @@ def main():
 
         st.session_state["current_digest"] = digest
         st.session_state["current_topic"] = topic_to_run
+        st.session_state["chat_messages"] = [
+            {"role": "user", "content": f"Research {topic_to_run}"},
+            {"role": "assistant", "content": digest}
+        ]
         st.rerun()
 
     # Active Chat View
@@ -1192,9 +1174,6 @@ def main():
                 st.markdown("<div style='padding-top: 24px;'>", unsafe_allow_html=True)
                 if history_records and st.button("🗑️ Clear All", key="clear_hist_tab", help="Delete all task history"):
                     _clear_all_history()
-                    st.session_state["current_digest"] = None
-                    st.session_state["current_topic"] = ""
-                    st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
 
             # Pure Python table renderer eliminating pyarrow DLL dependency

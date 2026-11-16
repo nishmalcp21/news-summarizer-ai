@@ -86,6 +86,7 @@ class PersistentMemory:
         return manage_memory("get_history", "all")
 
     def clear_history(self) -> None:
+        """Clear task history and cached digests from the persistent store."""
         manage_memory("clear_history", "all")
 
     def delete_topic_history(self, topic: str) -> None:
