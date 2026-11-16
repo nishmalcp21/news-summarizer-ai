@@ -14,6 +14,8 @@ Claude-style web chat app layout with:
 
 import sys
 import json
+import html
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,8 +36,10 @@ from src.qa import StoryQAEngine
 from src.exporter import (
     add_favorite,
     get_favorites,
-    export_to_html,
     export_to_json,
+    export_to_markdown,
+    export_to_pdf,
+    export_to_text,
 )
 from src.memory import PersistentMemory
 from src.tools.memory_tool import manage_memory as _manage_memory
@@ -54,6 +58,84 @@ def _clear_all_history() -> None:
 
 def _delete_topic_history(topic: str) -> None:
     PersistentMemory().delete_topic_history(topic)
+
+
+def _parse_digest_stories(digest_text: str) -> list:
+    if "Key stories:" not in digest_text:
+        return []
+
+    stories_block = digest_text.split("Key stories:", 1)[1].split("Based on", 1)[0].strip()
+    stories = []
+    for block in stories_block.split("\n\n"):
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if not lines:
+            continue
+
+        display_title = lines[0]
+        title = display_title
+        if ". " in title and title.split(". ", 1)[0].isdigit():
+            title = title.split(". ", 1)[1]
+        summary_lines = []
+        story = {
+            "title": title,
+            "source": "Verified Source",
+            "published_date": "Recent",
+            "url": "",
+        }
+
+        for line in lines[1:]:
+            if line.startswith("Source:"):
+                source_parts = line.removeprefix("Source:").strip().split("|", 2)
+                story["source"] = source_parts[0].strip() if source_parts else "Verified Source"
+                if len(source_parts) > 1:
+                    story["published_date"] = source_parts[1].strip()
+                if len(source_parts) > 2:
+                    story["url"] = source_parts[2].strip()
+            else:
+                summary_lines.append(line)
+        story["summary"] = " ".join(summary_lines)
+        stories.append(story)
+    return stories
+
+
+def _build_history_table_html(history_records: list) -> str:
+    rows = []
+    for record in reversed(history_records[-10:]):
+        status_text = "Success" if record.get("success") else "Incomplete"
+        values = (
+            record.get("topic", "N/A"),
+            record.get("num_stories", "N/A"),
+            record.get("time_range", "N/A"),
+            status_text,
+            record.get("story_count", "N/A"),
+        )
+        cells = "".join(f"<td>{html.escape(str(value))}</td>" for value in values)
+        rows.append(f"<tr>{cells}</tr>")
+    return (
+        '<div style="overflow-x: auto; margin-top: 10px;">'
+        '<table class="claude-table"><thead><tr>'
+        "<th>Topic</th><th>Stories</th><th>Time Horizon</th>"
+        "<th>Status</th><th>Count</th>"
+        "</tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table></div>"
+    )
+
+
+def _build_history_markdown(history_records: list) -> str:
+    lines = [
+        "| Topic | Stories | Time Horizon | Status | Count |",
+        "| --- | ---: | --- | --- | ---: |",
+    ]
+    for record in reversed(history_records):
+        status = "Success" if record.get("success") else "Incomplete"
+        topic = str(record.get("topic", "N/A")).replace("|", "\\|")
+        lines.append(
+            f"| {topic} | {record.get('num_stories', 'N/A')} | "
+            f"{record.get('time_range', 'N/A')} | {status} | "
+            f"{record.get('story_count', 'N/A')} |"
+        )
+    return "\n".join(lines) + "\n"
 
 
 # ---------------------------------------------------------------------------
@@ -770,7 +852,7 @@ def main():
             mode = st.radio(
                 "Search & LLM Provider",
                 ["Offline Mock (Fast / Zero Token Cost)", "Live API (Tavily + LiteLLM)"],
-                index=0 if not config.tavily_api_key else 1
+                index=0
             )
 
             time_range = st.selectbox(
@@ -922,11 +1004,16 @@ def main():
             st.write(f"✓ Formulated {len(plan.steps)} verified execution steps")
             st.write("✓ Running Plain Python ReAct synthesis (`Think > Act > Look`)...")
 
-            digest = agent.run(
-                topic=topic_to_run,
-                num_stories=num_stories,
-                time_range=time_range
-            )
+            try:
+                digest = agent.run(
+                    topic=topic_to_run,
+                    num_stories=num_stories,
+                    time_range=time_range
+                )
+            except RuntimeError as error:
+                status.update(label="Synthesis failed", state="error", expanded=True)
+                st.error(f"Digest generation failed: {error}")
+                return
             status.update(label="✓ Synthesis complete", state="complete", expanded=False)
 
         st.session_state["current_digest"] = digest
@@ -1125,45 +1212,67 @@ def main():
         # Tab 4: Export & History
         with tab_export:
             st.markdown("#### Export Deliverables")
-            exp_c1, exp_c2, exp_c3 = st.columns(3)
-            digest_data = {
-                "topic": topic_disp,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "digest": digest_text
-            }
-
-            with exp_c1:
-                json_str = json.dumps(digest_data, indent=2)
-                st.download_button(
-                    label="📥 Download JSON",
-                    data=json_str,
-                    file_name=f"digest_{topic_disp.replace(' ', '_').lower()}.json",
-                    mime="application/json",
-                    use_container_width=True
+            if not digest_text:
+                st.info("Generate a digest before downloading it.")
+            else:
+                download_date = datetime.now(timezone.utc).date().isoformat()
+                safe_topic = re.sub(
+                    r"[^\w-]+", "_", topic_disp.strip(), flags=re.UNICODE
+                ).strip("_").lower() or "digest"
+                file_stem = f"digest_{safe_topic}_{download_date}"
+                digest_data = {
+                    "topic": topic_disp,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "digest": digest_text
+                }
+                digest_stories = _parse_digest_stories(digest_text)
+                markdown = export_to_markdown(
+                    topic_disp, digest_text, digest_stories, download_date
                 )
-
-            with exp_c2:
-                html_export_path = PROJECT_ROOT / "memory" / "temp_export.html"
-                export_to_html(
-                    topic=topic_disp,
-                    date_range="Recent",
-                    quick_summary=quick_sum if quick_sum else "Executive Overview",
-                    stories=[{"title": f"News Report on {topic_disp}", "summary": "Full digest details.", "source": "News Agent", "url": "#", "published_date": "2026-11-10"}],
-                    filepath=html_export_path
+                plain_text = export_to_text(
+                    topic_disp, digest_text, digest_stories, download_date
                 )
-                html_content = html_export_path.read_text(encoding="utf-8")
-                st.download_button(
-                    label="📄 Download HTML",
-                    data=html_content,
-                    file_name=f"digest_{topic_disp.replace(' ', '_').lower()}.html",
-                    mime="text/html",
-                    use_container_width=True
+                pdf_bytes = export_to_pdf(
+                    topic_disp, digest_text, digest_stories, download_date
                 )
+                download_cols = st.columns(5)
 
-            with exp_c3:
-                if st.button("⭐ Bookmark Topic", use_container_width=True):
-                    add_favorite(topic_disp)
-                    st.success(f"Bookmarked '{topic_disp}'!")
+                with download_cols[0]:
+                    st.download_button(
+                        label="📝 Download Markdown",
+                        data=markdown,
+                        file_name=f"{file_stem}.md",
+                        mime="text/markdown",
+                        use_container_width=True
+                    )
+                with download_cols[1]:
+                    st.download_button(
+                        label="📄 Download PDF",
+                        data=pdf_bytes,
+                        file_name=f"{file_stem}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+                with download_cols[2]:
+                    st.download_button(
+                        label="📃 Download Text",
+                        data=plain_text,
+                        file_name=f"{file_stem}.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
+                with download_cols[3]:
+                    st.download_button(
+                        label="📥 Download JSON",
+                        data=json.dumps(digest_data, indent=2, ensure_ascii=False),
+                        file_name=f"{file_stem}.json",
+                        mime="application/json",
+                        use_container_width=True
+                    )
+                with download_cols[4]:
+                    if st.button("⭐ Bookmark Topic", use_container_width=True):
+                        add_favorite(topic_disp)
+                        st.success(f"Bookmarked '{topic_disp}'!")
 
             st.markdown("<hr style='border: none; border-top: 1px solid var(--border-color); margin: 20px 0;'>", unsafe_allow_html=True)
 
@@ -1176,41 +1285,20 @@ def main():
                     _clear_all_history()
                 st.markdown("</div>", unsafe_allow_html=True)
 
-            # Pure Python table renderer eliminating pyarrow DLL dependency
             if history_records:
-                table_rows = ""
-                for rec in reversed(history_records[-10:]):
-                    status_text = "Success" if rec.get("success") else "Incomplete"
-                    table_rows += f"""
-                    <tr>
-                        <td>{rec.get('topic', 'N/A')}</td>
-                        <td>{rec.get('num_stories', 'N/A')}</td>
-                        <td>{rec.get('time_range', 'N/A')}</td>
-                        <td>{status_text}</td>
-                        <td>{rec.get('story_count', 'N/A')}</td>
-                    </tr>
-                    """
-                table_html = f"""
-                <div style="overflow-x: auto; margin-top: 10px;">
-                    <table class="claude-table">
-                        <thead>
-                            <tr>
-                                <th>Topic</th>
-                                <th>Stories</th>
-                                <th>Time Horizon</th>
-                                <th>Status</th>
-                                <th>Count</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {table_rows}
-                        </tbody>
-                    </table>
-                </div>
-                """
-                st.markdown(table_html, unsafe_allow_html=True)
+                st.markdown(
+                    _build_history_table_html(history_records),
+                    unsafe_allow_html=True
+                )
             else:
                 st.caption("No task history recorded yet.")
+            st.download_button(
+                label="Download history (.md)",
+                data=_build_history_markdown(history_records),
+                file_name=f"task_history_{datetime.now(timezone.utc).date().isoformat()}.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
 
         st.markdown('</div>', unsafe_allow_html=True)
 

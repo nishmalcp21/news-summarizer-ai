@@ -92,6 +92,14 @@ class TestAgentLoop(unittest.TestCase):
             }
         ]
         self.agent.tools["search_news"] = mock_search
+        self.agent.tools["extract_article"] = MagicMock(return_value={
+            "story_id": "1",
+            "url": "https://example.com/chip",
+            "text": "<article_data id='1'>Photonic processor details.</article_data>",
+            "published_date": "2026-11-10",
+            "is_fallback": False,
+            "status": "extracted"
+        })
 
         topic = "Photonic AI Chips"
         # Run 1

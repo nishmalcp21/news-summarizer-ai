@@ -2,14 +2,14 @@
 Unit tests for Phase 7 (Post-MVP Advanced Enhancements):
 1. Themed section categorization (src/theming.py)
 2. Favorite topics management (src/exporter.py)
-3. HTML & JSON export functionality (src/exporter.py)
+3. JSON export functionality (src/exporter.py)
 """
 
 import unittest
 from pathlib import Path
 import json
 from src.theming import categorize_story, group_stories_by_theme, format_themed_digest
-from src.exporter import add_favorite, remove_favorite, get_favorites, export_to_json, export_to_html
+from src.exporter import add_favorite, remove_favorite, get_favorites, export_to_json
 from src.config import PROJECT_ROOT
 
 
@@ -77,11 +77,10 @@ class TestPostMVP(unittest.TestCase):
         remove_favorite(test_topic)
         self.assertNotIn(test_topic, get_favorites())
 
-    def test_05_export_html_and_json(self):
-        """Verify HTML and JSON export generation."""
+    def test_05_export_json(self):
+        """Verify JSON export generation."""
         export_dir = PROJECT_ROOT / "memory" / "test_exports"
         json_path = export_dir / "digest.json"
-        html_path = export_dir / "digest.html"
 
         sample_stories = [
             {
@@ -99,18 +98,8 @@ class TestPostMVP(unittest.TestCase):
         loaded_json = json.loads(json_path.read_text("utf-8"))
         self.assertEqual(loaded_json["topic"], "Fusion")
 
-        # Export HTML
-        export_to_html("Fusion", "Nov 03 to Nov 10, 2026 (UTC)", "Breakthrough achieved.", sample_stories, html_path)
-        self.assertTrue(html_path.exists())
-        html_text = html_path.read_text("utf-8")
-        self.assertIn("Topic: Fusion", html_text)
-        self.assertIn("Fusion Milestone", html_text)
-
-        # Cleanup test files
         if json_path.exists():
             json_path.unlink()
-        if html_path.exists():
-            html_path.unlink()
         if export_dir.exists():
             export_dir.rmdir()
 

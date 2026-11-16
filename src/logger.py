@@ -35,6 +35,8 @@ class AgentAuditLogger:
         self._logger.addHandler(file_handler)
 
         # Console handler
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(errors="backslashreplace")
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(formatter)
         self._logger.addHandler(console_handler)

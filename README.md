@@ -37,6 +37,8 @@ A beginner-friendly, highly reliable AI agent built with **pure plain Python** (
      - Tabbed architecture: *Digest Studio*, *Themed Insights*, *Story Follow-Up Q&A*, and *Export & Bookmarks*.
      - One-click trending topic presets and verified story cards.
      - Thumbs up / thumbs down quality rating feedback.
+9. **In-Memory Exports**:
+   - Download each digest as Markdown, PDF, text, or JSON, plus task history as Markdown.
 
 ---
 

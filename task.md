@@ -301,7 +301,8 @@ antiGravity/
 - [x] **7.2 Multi-Language Output Support**
   - Support translating or generating digests in target languages (`en`, `es`, `fr`, `de`, `hi`).
 - [x] **7.3 Favorites & Digest Exporter (`src/exporter.py`)**
-  - Save favorite topics to persistent memory, export digests to formatted HTML and JSON.
+  - Save favorite topics to persistent memory and export digests to Markdown, PDF, text, and JSON.
+  - Export task history as Markdown without creating temporary files.
 
 ---
 

@@ -8,6 +8,7 @@ Unit tests for the 4 core tools in plain Python:
 
 import unittest
 from unittest.mock import patch, MagicMock
+from urllib.error import URLError
 from src.tools.search import search_news, map_time_range
 from src.tools.extractor import extract_article
 from src.tools.validator import validate_link
@@ -61,12 +62,14 @@ class TestTools(unittest.TestCase):
             self.assertEqual(results[0]["published_date"], "2026-11-08")
 
     def test_03_extract_article_fallback(self):
-        """Verify extract_article falls back safely to snippet on invalid/empty URLs."""
-        res = extract_article(
-            url="https://non-existent-site-xyz-123.com/story",
-            story_id="1",
-            fallback_snippet="Fallback text about EV market."
-        )
+        """Verify extract_article falls back safely when the network is unavailable."""
+        with patch("src.tools.extractor.urlopen", side_effect=URLError("offline")):
+            with patch("src.tools.extractor.logger.log_error"):
+                res = extract_article(
+                    url="https://example.com/story",
+                    story_id="1",
+                    fallback_snippet="Fallback text about EV market."
+                )
         self.assertEqual(res["story_id"], "1")
         self.assertTrue(res["is_fallback"])
         self.assertIn("summary based on snippet only", res["text"])
