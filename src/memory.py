@@ -58,21 +58,57 @@ class WorkingMemory:
 class PersistentMemory:
     """Manages cross-task persistent cache and task execution logs."""
 
+    def __init__(self, user_id: Optional[str] = None):
+        self.user_id = user_id
+
+    def _active_user_id(self, user_id: Optional[str]) -> Optional[str]:
+        return self.user_id if user_id is None else user_id
+
     @staticmethod
     def _make_cache_key(topic: str, num_stories: int, time_range: str) -> str:
         clean_topic = topic.strip().lower()
         return f"{clean_topic}::{num_stories}::{time_range.lower()}"
 
-    def get_cached_digest(self, topic: str, num_stories: int, time_range: str) -> Optional[str]:
+    def get_cached_digest(
+        self,
+        topic: str,
+        num_stories: int,
+        time_range: str,
+        user_id: Optional[str] = None
+    ) -> Optional[str]:
         cache_key = self._make_cache_key(topic, num_stories, time_range)
-        cached = manage_memory("get_cache", cache_key)
+        cached = manage_memory(
+            "get_cache",
+            cache_key,
+            user_id=self._active_user_id(user_id)
+        )
         return cached if isinstance(cached, str) else None
 
-    def save_cached_digest(self, topic: str, num_stories: int, time_range: str, digest: str) -> None:
+    def save_cached_digest(
+        self,
+        topic: str,
+        num_stories: int,
+        time_range: str,
+        digest: str,
+        user_id: Optional[str] = None
+    ) -> None:
         cache_key = self._make_cache_key(topic, num_stories, time_range)
-        manage_memory("set_cache", cache_key, digest)
+        manage_memory(
+            "set_cache",
+            cache_key,
+            digest,
+            user_id=self._active_user_id(user_id)
+        )
 
-    def record_task_run(self, topic: str, num_stories: int, time_range: str, success: bool, story_count: int) -> None:
+    def record_task_run(
+        self,
+        topic: str,
+        num_stories: int,
+        time_range: str,
+        success: bool,
+        story_count: int,
+        user_id: Optional[str] = None
+    ) -> None:
         record = {
             "topic": topic,
             "num_stories": num_stories,
@@ -80,15 +116,36 @@ class PersistentMemory:
             "success": success,
             "story_count": story_count
         }
-        manage_memory("append_history", "record", record)
+        manage_memory(
+            "append_history",
+            "record",
+            record,
+            user_id=self._active_user_id(user_id)
+        )
 
-    def get_history(self) -> List[Dict[str, Any]]:
-        return manage_memory("get_history", "all")
+    def get_history(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        return manage_memory(
+            "get_history",
+            "all",
+            user_id=self._active_user_id(user_id)
+        )
 
-    def clear_history(self) -> None:
+    def clear_history(self, user_id: Optional[str] = None) -> None:
         """Clear task history and cached digests from the persistent store."""
-        manage_memory("clear_history", "all")
+        manage_memory(
+            "clear_history",
+            "all",
+            user_id=self._active_user_id(user_id)
+        )
 
-    def delete_topic_history(self, topic: str) -> None:
-        manage_memory("delete_topic_history", topic)
+    def delete_topic_history(
+        self,
+        topic: str,
+        user_id: Optional[str] = None
+    ) -> None:
+        manage_memory(
+            "delete_topic_history",
+            topic,
+            user_id=self._active_user_id(user_id)
+        )
 

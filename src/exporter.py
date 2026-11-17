@@ -12,45 +12,65 @@ from typing import Any, Dict, List, Optional
 from fpdf import FPDF
 
 from src.config import PROJECT_ROOT
+from src.tools.memory_tool import (
+    get_current_user_id,
+    user_data_file_path,
+    write_json_atomic,
+)
 
 
 FAVORITES_FILE = PROJECT_ROOT / "memory" / "favorites.json"
 
 
-def get_favorites() -> List[str]:
+def get_favorites(user_id: Optional[str] = None) -> List[str]:
     """Retrieves list of saved favorite topics."""
-    if not FAVORITES_FILE.exists():
+    active_user_id = user_id if user_id is not None else get_current_user_id()
+    favorites_file = (
+        user_data_file_path(active_user_id, "favorites.json")
+        if active_user_id else FAVORITES_FILE
+    )
+    if not favorites_file.exists():
         return []
     try:
-        with open(FAVORITES_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        with open(favorites_file, "r", encoding="utf-8") as f:
+            favorites = json.load(f)
+        if not isinstance(favorites, list):
+            return []
+        return [topic for topic in favorites if isinstance(topic, str)]
     except Exception:
         return []
 
 
-def add_favorite(topic: str) -> bool:
+def add_favorite(topic: str, user_id: Optional[str] = None) -> bool:
     """Adds a topic to favorites."""
     cleaned = topic.strip()
     if not cleaned:
         return False
-    favs = get_favorites()
+    favs = get_favorites(user_id)
     if cleaned not in favs:
         favs.append(cleaned)
-        FAVORITES_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(FAVORITES_FILE, "w", encoding="utf-8") as f:
-            json.dump(favs, f, indent=2)
+        active_user_id = user_id if user_id is not None else get_current_user_id()
+        favorites_file = (
+            user_data_file_path(active_user_id, "favorites.json")
+            if active_user_id else FAVORITES_FILE
+        )
+        write_json_atomic(favorites_file, favs)
         return True
     return False
 
 
-def remove_favorite(topic: str) -> bool:
+def remove_favorite(topic: str, user_id: Optional[str] = None) -> bool:
     """Removes a topic from favorites."""
     cleaned = topic.strip()
-    favs = get_favorites()
+    favs = get_favorites(user_id)
     if cleaned in favs:
         favs.remove(cleaned)
-        with open(FAVORITES_FILE, "w", encoding="utf-8") as f:
-            json.dump(favs, f, indent=2)
+        active_user_id = user_id if user_id is not None else get_current_user_id()
+        favorites_file = (
+            user_data_file_path(active_user_id, "favorites.json")
+            if active_user_id else FAVORITES_FILE
+        )
+        write_json_atomic(favorites_file, favs)
         return True
     return False
 

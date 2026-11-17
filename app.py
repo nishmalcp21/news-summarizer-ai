@@ -9,6 +9,7 @@ import json
 import html
 import logging
 import re
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,11 +36,30 @@ from src.exporter import (
     export_to_text,
 )
 from src.memory import PersistentMemory
-from src.tools.memory_tool import manage_memory as _manage_memory
+from src.tools.memory_tool import (
+    get_current_user_id,
+    is_valid_user_id,
+    manage_memory as _manage_memory,
+    set_current_user_id,
+    user_data_file_path,
+    write_json_atomic,
+)
+
+
+def _resolve_user_id(query_params, session_state) -> str:
+    user_id = query_params.get("uid")
+    if not is_valid_user_id(user_id):
+        user_id = secrets.token_urlsafe(8)
+        while not is_valid_user_id(user_id):
+            user_id = secrets.token_urlsafe(8)
+        query_params["uid"] = user_id
+    session_state["user_id"] = user_id
+    set_current_user_id(user_id)
+    return user_id
 
 
 def _clear_all_history() -> None:
-    PersistentMemory().clear_history()
+    PersistentMemory(user_id=st.session_state.get("user_id")).clear_history()
     st.session_state["current_digest"] = None
     st.session_state["current_stories"] = []
     st.session_state["current_topic"] = ""
@@ -50,7 +70,7 @@ def _clear_all_history() -> None:
     st.rerun()
 
 def _delete_topic_history(topic: str) -> None:
-    PersistentMemory().delete_topic_history(topic)
+    PersistentMemory(user_id=st.session_state.get("user_id")).delete_topic_history(topic)
 
 
 def _sync_search_input() -> None:
@@ -93,6 +113,12 @@ def _parse_digest_stories(digest_text: str) -> list:
         story["summary"] = " ".join(summary_lines)
         stories.append(story)
     return stories
+
+
+def _active_user_id(user_id=None):
+    if user_id is not None:
+        return user_id
+    return get_current_user_id() or st.session_state.get("user_id")
 
 
 def _build_history_table_html(history_records: list) -> str:
@@ -138,28 +164,39 @@ def _build_history_markdown(history_records: list) -> str:
 # ---------------------------------------------------------------------------
 # Feedback & Rating Persistence (PRD Section 10)
 # ---------------------------------------------------------------------------
-def get_ratings():
-    ratings_file = PROJECT_ROOT / "memory" / "ratings.json"
+def get_ratings(user_id=None):
+    active_user_id = _active_user_id(user_id)
+    ratings_file = (
+        user_data_file_path(active_user_id, "ratings.json")
+        if active_user_id
+        else PROJECT_ROOT / "memory" / "ratings.json"
+    )
     if not ratings_file.exists():
         return []
     try:
         with open(ratings_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+            ratings = json.load(f)
+        if not isinstance(ratings, list):
+            return []
+        return [record for record in ratings if isinstance(record, dict)]
     except Exception:
         return []
 
 
-def save_user_rating(topic: str, rating: str) -> None:
-    ratings_file = PROJECT_ROOT / "memory" / "ratings.json"
-    ratings_file.parent.mkdir(parents=True, exist_ok=True)
-    records = get_ratings()
+def save_user_rating(topic: str, rating: str, user_id=None) -> None:
+    active_user_id = _active_user_id(user_id)
+    ratings_file = (
+        user_data_file_path(active_user_id, "ratings.json")
+        if active_user_id
+        else PROJECT_ROOT / "memory" / "ratings.json"
+    )
+    records = get_ratings(active_user_id)
     records.append({
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "topic": topic,
         "rating": rating
     })
-    with open(ratings_file, "w", encoding="utf-8") as f:
-        json.dump(records, f, indent=2)
+    write_json_atomic(ratings_file, records)
 
 
 # ---------------------------------------------------------------------------
@@ -1380,6 +1417,7 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
+    user_id = _resolve_user_id(st.query_params, st.session_state)
 
     # Session state initialization
     if "current_digest" not in st.session_state:
@@ -1427,7 +1465,7 @@ def main():
             unsafe_allow_html=True
         )
 
-        pm = PersistentMemory()
+        pm = PersistentMemory(user_id=user_id)
         history_records = pm.get_history()
 
         recent_topics = []
@@ -1496,7 +1534,7 @@ def main():
             except Exception:
                 pass
             st.toggle("Dark appearance", value=dark_default, key="dark_mode_toggle")
-            favorites = get_favorites()
+            favorites = get_favorites(user_id=user_id)
             if favorites:
                 selected_fav = st.selectbox(
                     "Load bookmark:",
@@ -1789,11 +1827,11 @@ def main():
             r_c1, r_c2, _ = st.columns([1.5, 1.5, 4])
             with r_c1:
                 if st.button("👍 High Quality", use_container_width=True):
-                    save_user_rating(topic_disp, "positive")
+                    save_user_rating(topic_disp, "positive", user_id=user_id)
                     st.success("Rating recorded.")
             with r_c2:
                 if st.button("👎 Needs Improvement", use_container_width=True):
-                    save_user_rating(topic_disp, "negative")
+                    save_user_rating(topic_disp, "negative", user_id=user_id)
                     st.info("Feedback captured.")
 
         # Tab 2: Themed Insights
@@ -1923,7 +1961,7 @@ def main():
                     )
                 with download_cols[4]:
                     if st.button("⭐ Bookmark Topic", use_container_width=True):
-                        add_favorite(topic_disp)
+                        add_favorite(topic_disp, user_id=user_id)
                         st.success(f"Bookmarked '{topic_disp}'!")
 
             st.markdown("<hr style='border: none; border-top: 1px solid var(--border-color); margin: 20px 0;'>", unsafe_allow_html=True)
