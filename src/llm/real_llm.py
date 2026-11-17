@@ -145,7 +145,7 @@ class RealLLMClient(BaseLLMClient):
         }
 
         ordered_summaries = [
-            summary_map[f"[{idx}]"]
+            summary_map.get(f"[{idx}]", "")
             for idx in range(1, len(stories) + 1)
         ]
 

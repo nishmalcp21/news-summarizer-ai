@@ -8,6 +8,8 @@ from typing import Dict, Any, Optional
 from src.config import config
 from src.logger import logger
 
+MAX_HTML_BYTES = 2 * 1024 * 1024
+
 
 def extract_article(
     url: str,
@@ -51,7 +53,10 @@ def extract_article(
 )
 
         with urlopen(request, timeout=effective_timeout) as response:
-            downloaded = response.read().decode("utf-8", errors="replace")
+            downloaded = response.read(MAX_HTML_BYTES + 1)[:MAX_HTML_BYTES].decode(
+                "utf-8",
+                errors="replace"
+            )
         if not downloaded:
             logger.log_error(0, "extract_article", f"Fetch returned empty HTML for {url}. Using snippet fallback.")
             return _make_fallback_result(story_id, url, fallback_snippet, "empty HTML")

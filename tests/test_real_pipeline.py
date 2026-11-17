@@ -56,6 +56,20 @@ class TestRealPipeline(unittest.TestCase):
             summary = client.summarize_article("[1]", "<article_data id='1'>EV battery tech details</article_data>")
             self.assertIn("low-cost EV models", summary)
 
+    def test_05_batch_summarization_preserves_missing_slots(self):
+        """Verify missing IDs in a batch can be retried individually by the agent."""
+        client = RealLLMClient()
+        client._call_completion = MagicMock(return_value=(
+            '{"summaries": [{"id": "[1]", "summary": "First summary."}]}'
+        ))
+
+        summaries = client.summarize_articles([
+            {"text": "First article."},
+            {"text": "Second article."},
+        ])
+
+        self.assertEqual(summaries, ["First summary.", ""])
+
 
 if __name__ == "__main__":
     unittest.main()

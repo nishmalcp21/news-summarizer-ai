@@ -243,6 +243,9 @@ class PlainPythonNewsAgent:
             if batch_summaries is not None:
                 summary = batch_summaries[idx - 1]
             else:
+                summary = ""
+
+            if not summary or not summary.strip():
                 content = story.get("text", "") or story.get("snippet", "")
                 summary = self.llm.summarize_article(
                     story_id=story_id,

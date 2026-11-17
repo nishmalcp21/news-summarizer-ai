@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 from urllib.error import URLError
 from src.tools.search import search_news, map_time_range
-from src.tools.extractor import extract_article
+from src.tools.extractor import MAX_HTML_BYTES, extract_article
 from src.tools.validator import validate_link
 from src.tools.memory_tool import manage_memory
 from src.config import config
@@ -74,6 +74,24 @@ class TestTools(unittest.TestCase):
         self.assertTrue(res["is_fallback"])
         self.assertIn("summary based on snippet only", res["text"])
         self.assertIn("<article_data id=\"1\"", res["text"])
+
+    def test_03b_extract_article_limits_download_size(self):
+        """Verify large pages are capped before HTML parsing."""
+        import sys
+
+        response = MagicMock()
+        response.read.return_value = b"<html>news article</html>"
+        response.__enter__.return_value = response
+        mock_trafilatura = MagicMock()
+        mock_trafilatura.extract.return_value = "A sufficiently long article. " * 8
+        mock_trafilatura.extract_metadata.return_value = None
+
+        with patch.dict(sys.modules, {"trafilatura": mock_trafilatura}):
+            with patch("src.tools.extractor.urlopen", return_value=response):
+                result = extract_article("https://example.com/story")
+
+        response.read.assert_called_once_with(MAX_HTML_BYTES + 1)
+        self.assertEqual(result["status"], "extracted")
 
     def test_04_validate_link_blocklist(self):
         """Verify validate_link blocks known blocklisted domains immediately."""

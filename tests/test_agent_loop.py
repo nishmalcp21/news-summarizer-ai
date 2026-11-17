@@ -12,6 +12,7 @@ from unittest.mock import patch, MagicMock
 from src.agent import PlainPythonNewsAgent
 from src.llm.mock_llm import MockLLMClient
 from src.config import Config
+from src.memory import WorkingMemory
 
 
 class TestAgentLoop(unittest.TestCase):
@@ -131,6 +132,23 @@ class TestAgentLoop(unittest.TestCase):
         allowed = agent.planner.ask_permission("Run secondary search?")
         self.assertTrue(allowed)
         self.assertTrue(confirmed)
+
+    def test_05_only_missing_batch_summaries_are_retried(self):
+        """Verify an incomplete batch does not trigger redundant individual calls."""
+        stories = [
+            {"title": "First", "url": "https://example.com/1", "text": "First source."},
+            {"title": "Second", "url": "https://example.com/2", "text": "Second source."},
+        ]
+        self.mock_llm.summarize_articles = MagicMock(return_value=["Batch summary.", ""])
+        self.mock_llm.summarize_article = MagicMock(return_value="Individual summary.")
+        memory = WorkingMemory(topic="Test topic", num_stories=2)
+        memory.extracted_articles = stories
+
+        digest = self.agent._synthesize_digest(memory)
+
+        self.assertEqual(self.mock_llm.summarize_article.call_count, 1)
+        self.assertIn("Batch summary.", digest)
+        self.assertIn("Individual summary.", digest)
 
 
 if __name__ == "__main__":
