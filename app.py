@@ -1,20 +1,13 @@
 """
 Streamlit Web Interface for News Summarizer Agent.
-Claude-style web chat app layout with:
-- Modern CSS variables supporting Light (#FAF9F5) and Dark (#262624) palettes
-  via @media (prefers-color-scheme: dark) with 200ms smooth transitions.
-- Left sidebar with "New chat" button and recents chat list (collapsible on mobile).
-- Centered 760px max-width chat column.
-- Fixed bottom input box (rounded, soft border, grows with text, send button on right).
-- Simple centered greeting in the empty state.
-- Right-aligned soft rounded user message bubble.
-- Agent reply plain text directly on page with no bubble.
-- Pure Python history table eliminating pyarrow.lib DLL crash.
+Modern news dashboard with a responsive search-first home, live agent progress,
+verified-story cards, themed insights, follow-up Q&A, and export/history tools.
 """
 
 import sys
 import json
 import html
+import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,6 +51,10 @@ def _clear_all_history() -> None:
 
 def _delete_topic_history(topic: str) -> None:
     PersistentMemory().delete_topic_history(topic)
+
+
+def _sync_search_input() -> None:
+    st.session_state["search_input"] = st.session_state.get("search_box", "")
 
 
 def _parse_digest_stories(digest_text: str) -> list:
@@ -166,13 +163,13 @@ def save_user_rating(topic: str, rating: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Claude-Style Design & CSS Injection (Controlled by Streamlit Theme Menu)
+# News Dashboard Styling (controlled by the in-app appearance toggle)
 # ---------------------------------------------------------------------------
 def inject_claude_styling():
     # Detect Streamlit native theme selection (System / Light / Dark)
-    theme_type = "light"
+    theme_type = "dark" if st.session_state.get("dark_mode_toggle", False) else "light"
     try:
-        if hasattr(st, "context") and hasattr(st.context, "theme") and st.context.theme:
+        if "dark_mode_toggle" not in st.session_state and hasattr(st, "context") and hasattr(st.context, "theme") and st.context.theme:
             t = st.context.theme.type
             if t in ("dark", "light"):
                 theme_type = t
@@ -181,43 +178,45 @@ def inject_claude_styling():
 
     if theme_type == "dark":
         palette = {
-            "background_color": "#0B1220",
-            "secondary_background_color": "#101A2D",
-            "surface_color": "#131D33",
-            "text_color": "#E8EEF9",
-            "text_secondary": "#A7B4CA",
-            "subtitle_color": "#A7B4CA",
-            "label_color": "#9EACC3",
-            "placeholder_color": "#78869E",
-            "border_color": "#263550",
-            "bubble_user": "#1B2942",
-            "primary_color": "#4F8CFF",
-            "accent_hover": "#79A8FF",
-            "focus_ring": "rgba(79, 140, 255, 0.35)",
-            "button_text": "#E8EEF9",
+            "background_color": "#FBF8F3",
+            "secondary_background_color": "#F3EEE6",
+            "surface_color": "#FFFFFF",
+            "text_color": "#1A1A1A",
+            "text_secondary": "#4A4A4A",
+            "subtitle_color": "#4A4A4A",
+            "label_color": "#4A4A4A",
+            "placeholder_color": "#4A4A4A",
+            "border_color": "#E3DCCF",
+            "bubble_user": "#F3EEE6",
+            "primary_color": "#C8102E",
+            "accent_hover": "#A30D25",
+            "focus_ring": "rgba(200, 16, 46, 0.2)",
+            "button_text": "#1A1A1A",
             "primary_btn_text": "#FFFFFF",
-            "code_bg": "#0E172A",
-            "shadow_soft": "0 8px 24px rgba(0, 0, 0, 0.22)",
+            "link_color": "#0B5CAD",
+            "code_bg": "#F3EEE6",
+            "shadow_soft": "0 1px 3px rgba(0, 0, 0, 0.08)",
         }
     else:
         palette = {
-            "background_color": "#F5F8FF",
-            "secondary_background_color": "#EEF3FC",
+            "background_color": "#FBF8F3",
+            "secondary_background_color": "#F3EEE6",
             "surface_color": "#FFFFFF",
-            "text_color": "#152238",
-            "text_secondary": "#54657F",
-            "subtitle_color": "#54657F",
-            "label_color": "#536680",
-            "placeholder_color": "#73839B",
-            "border_color": "#DCE5F2",
-            "bubble_user": "#E8F0FF",
-            "primary_color": "#2563EB",
-            "accent_hover": "#1D4ED8",
-            "focus_ring": "rgba(37, 99, 235, 0.22)",
-            "button_text": "#152238",
+            "text_color": "#1A1A1A",
+            "text_secondary": "#4A4A4A",
+            "subtitle_color": "#4A4A4A",
+            "label_color": "#4A4A4A",
+            "placeholder_color": "#4A4A4A",
+            "border_color": "#E3DCCF",
+            "bubble_user": "#F3EEE6",
+            "primary_color": "#C8102E",
+            "accent_hover": "#A30D25",
+            "focus_ring": "rgba(200, 16, 46, 0.2)",
+            "button_text": "#1A1A1A",
             "primary_btn_text": "#FFFFFF",
-            "code_bg": "#F2F6FC",
-            "shadow_soft": "0 8px 24px rgba(19, 46, 89, 0.06)",
+            "link_color": "#0B5CAD",
+            "code_bg": "#F3EEE6",
+            "shadow_soft": "0 1px 3px rgba(0, 0, 0, 0.08)",
         }
 
     css = """
@@ -237,6 +236,7 @@ def inject_claude_styling():
             --bubble-user: __bubble_user__;
             --primary-color: __primary_color__;
             --accent-hover: __accent_hover__;
+            --link-color: __link_color__;
             --focus-ring: __focus_ring__;
             --button-text: __button_text__;
             --primary-btn-text: __primary_btn_text__;
@@ -269,7 +269,7 @@ def inject_claude_styling():
         }
         h1, h2, h3, h4, h5, h6,
         .greeting-title, .story-title {
-            font-family: 'Playfair Display', Georgia, serif !important;
+            font-family: 'Inter', sans-serif !important;
             color: var(--text-color);
         }
 
@@ -553,7 +553,7 @@ def inject_claude_styling():
         .agent-reply-body h3, 
         .agent-reply-body h4 {
             color: var(--text-color);
-            font-family: 'Playfair Display', Georgia, serif;
+            font-family: 'Inter', sans-serif;
             font-weight: 700;
             margin-top: 24px;
             margin-bottom: 12px;
@@ -586,12 +586,12 @@ def inject_claude_styling():
         }
         .news-card:hover {
             border-color: var(--primary-color) !important;
-            box-shadow: 0 14px 30px rgba(19, 46, 89, 0.12) !important;
-            transform: translateY(-2px);
+            box-shadow: 0 4px 14px rgba(16, 24, 40, 0.08) !important;
+            transform: translateY(-1px);
         }
         .story-title {
             color: var(--text-color) !important;
-            font-family: 'Playfair Display', Georgia, serif !important;
+            font-family: 'Inter', sans-serif !important;
             font-size: 20px !important;
             font-weight: 700 !important;
             margin-top: 10px !important;
@@ -652,7 +652,7 @@ def inject_claude_styling():
             box-shadow: var(--shadow-soft) !important;
         }
         .quick-summary-title {
-            font-family: 'Playfair Display', Georgia, serif !important;
+            font-family: 'Inter', sans-serif !important;
             font-weight: 600 !important;
             font-size: 17px !important;
             margin-bottom: 9px !important;
@@ -771,24 +771,491 @@ def inject_claude_styling():
         [data-testid="stSidebar"] div[data-testid="column"]:last-child .stButton > button:not([kind="primary"]):hover {
             background-color: var(--secondary-background-color) !important;
             border-color: var(--border-color) !important;
-            color: #C0392B !important;
+            color: var(--accent-hover) !important;
         }
 
         /* Responsive design */
         @media (max-width: 768px) {
             .block-container {
-                padding-left: 1.1rem !important;
-                padding-right: 1.1rem !important;
+                padding-left: 0.85rem !important;
+                padding-right: 0.85rem !important;
             }
             .user-msg-bubble {
                 max-width: 95%;
             }
             .greeting-title {
-                font-size: 32px !important;
+                font-size: 30px !important;
             }
             .news-card {
                 padding: 20px !important;
             }
+            [data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+                gap: 0.6rem !important;
+            }
+            [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+                min-width: min(100%, 240px) !important;
+            }
+            .stTabs [data-baseweb="tab-list"] {
+                overflow-x: auto !important;
+                flex-wrap: nowrap !important;
+            }
+            .stTabs [data-baseweb="tab"] {
+                white-space: nowrap !important;
+                padding: 9px 12px !important;
+            }
+        }
+
+        /* News dashboard refinements */
+        .block-container {
+            max-width: 1220px !important;
+            padding-top: 1.1rem !important;
+            padding-bottom: 5rem !important;
+        }
+        [data-testid="stHeader"],
+        [data-testid="stBottom"],
+        [data-testid="stBottom"] > div,
+        [data-testid="stBottomBlockContainer"] {
+            background: var(--background-color) !important;
+        }
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            border-radius: 16px !important;
+            border-color: var(--border-color) !important;
+            background: var(--surface-color) !important;
+            box-shadow: var(--shadow-soft) !important;
+        }
+        .story-summary {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 3;
+            overflow: hidden;
+            min-height: 4.4em;
+        }
+        .stTextInput input {
+            min-height: 52px !important;
+            border-radius: 14px !important;
+            font-size: 15px !important;
+            padding-left: 16px !important;
+        }
+        [class*="st-key-preset_"] button {
+            border-radius: 9999px !important;
+            min-height: 42px !important;
+        }
+        .badge-source, .badge-date, .badge-theme {
+            margin: 0 6px 6px 0 !important;
+        }
+        .stPopover [data-testid="stPopover"] {
+            border-radius: 14px !important;
+        }
+        [data-testid="stSidebar"] div[data-testid="column"]:last-child .stButton > button {
+            width: 44px !important;
+            min-width: 44px !important;
+            padding: 0 !important;
+            white-space: nowrap !important;
+            justify-content: center !important;
+        }
+
+        /* Clean White theme overrides */
+        html, body, .stApp, [data-testid="stAppViewContainer"],
+        [data-testid="stMain"], [data-testid="stHeader"],
+        [data-testid="stToolbar"], [data-testid="stBottom"],
+        [data-testid="stBottom"] > div, [data-testid="stBottomBlockContainer"] {
+            background-color: var(--background-color) !important;
+            color: var(--text-color) !important;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+        }
+        body, .stApp, [data-testid="stAppViewContainer"] {
+            font-size: 15px !important;
+            line-height: 1.6 !important;
+        }
+        [data-testid="stHeader"], [data-testid="stToolbar"] {
+            background-color: var(--background-color) !important;
+        }
+        h1, h2, h3, h4, h5, h6, .greeting-title, .story-title,
+        .quick-summary-title, .agent-reply-body h1, .agent-reply-body h2,
+        .agent-reply-body h3, .agent-reply-body h4 {
+            color: var(--text-color) !important;
+            font-family: 'Inter', sans-serif !important;
+            font-weight: 600 !important;
+        }
+        .block-container h1 {
+            font-size: 2.4rem !important;
+            font-weight: 700 !important;
+            line-height: 1.2 !important;
+            margin-bottom: 0.15rem !important;
+        }
+        .story-title { font-size: 19px !important; line-height: 1.4 !important; }
+        .story-summary, .quick-summary-text, .agent-reply-body, .agent-reply-body p {
+            color: var(--text-secondary) !important;
+            font-size: 15px !important;
+            line-height: 1.6 !important;
+        }
+        .greeting-sub, [data-testid="stCaptionContainer"],
+        [data-testid="stCaptionContainer"] * {
+            color: var(--text-secondary) !important;
+            font-size: 15px !important;
+            line-height: 1.6 !important;
+            opacity: 1 !important;
+        }
+        [data-testid="stSidebar"] {
+            background-color: var(--secondary-background-color) !important;
+            border-right: 1px solid var(--border-color) !important;
+        }
+        .news-card, [data-testid="stVerticalBlockBorderWrapper"] {
+            background-color: var(--surface-color) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 16px !important;
+            box-shadow: var(--shadow-soft) !important;
+        }
+        .news-card {
+            padding: 20px !important;
+            margin-bottom: 20px !important;
+        }
+        .news-card:hover {
+            border-color: var(--primary-color) !important;
+            box-shadow: 0 4px 14px rgba(16, 24, 40, 0.08) !important;
+            transform: translateY(-1px);
+        }
+        .badge-source, .badge-date, .badge-theme {
+            background-color: var(--secondary-background-color) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 9999px !important;
+            color: var(--text-secondary) !important;
+            font-weight: 500 !important;
+        }
+        .quick-summary-box {
+            background-color: var(--surface-color) !important;
+            border: 1px solid var(--border-color) !important;
+            border-left: 3px solid var(--primary-color) !important;
+            border-radius: 16px !important;
+            box-shadow: var(--shadow-soft) !important;
+        }
+        .quick-summary-title { color: var(--primary-color) !important; }
+        .stTabs [data-baseweb="tab-list"] {
+            background: transparent !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+        .stTabs [data-baseweb="tab"] {
+            background: transparent !important;
+            border-radius: 0 !important;
+        }
+        .stTabs [data-baseweb="tab"] *,
+        .stTabs [data-baseweb="tab"]:not([aria-selected="true"]) * {
+            color: var(--text-secondary) !important;
+        }
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            border-bottom: 2px solid var(--primary-color) !important;
+        }
+        .stTabs [data-baseweb="tab"][aria-selected="true"] * {
+            color: var(--primary-color) !important;
+        }
+        .stButton > button:not([kind="primary"]),
+        .stDownloadButton > button {
+            background-color: var(--surface-color) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 16px !important;
+            color: var(--button-text) !important;
+            box-shadow: var(--shadow-soft) !important;
+        }
+        .stButton > button[kind="primary"] {
+            background-color: var(--primary-color) !important;
+            border-color: var(--primary-color) !important;
+            color: var(--primary-btn-text) !important;
+            border-radius: 16px !important;
+            box-shadow: var(--shadow-soft) !important;
+        }
+        .stButton > button[kind="primary"] * {
+            color: var(--primary-btn-text) !important;
+        }
+        .stButton > button:not([kind="primary"]), .stDownloadButton > button {
+            font-size: 14.5px !important;
+        }
+        [data-testid="stSidebar"] .stButton > button[kind="primary"] {
+            background-color: var(--primary-color) !important;
+            border-color: var(--primary-color) !important;
+            color: var(--primary-btn-text) !important;
+        }
+        [data-testid="stSidebar"] .stButton > button:not([kind="primary"]) {
+            border-radius: 12px !important;
+        }
+        [data-testid="stSidebar"] div[data-testid="column"]:last-child .stButton > button:not([kind="primary"]):hover {
+            background-color: var(--secondary-background-color) !important;
+            border-color: var(--border-color) !important;
+            color: var(--accent-hover) !important;
+        }
+        .stTextInput > div > div > input {
+            background-color: var(--surface-color) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 16px !important;
+            color: var(--text-color) !important;
+        }
+        .stTextInput > div > div > input::placeholder,
+        [data-testid="stChatInput"] textarea::placeholder {
+            color: var(--text-secondary) !important;
+            opacity: 1 !important;
+        }
+        .stTextInput > div > div > input:focus {
+            border-color: var(--primary-color) !important;
+            box-shadow: 0 0 0 3px var(--focus-ring) !important;
+        }
+        [data-testid="stChatInput"] {
+            background-color: var(--surface-color) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 999px !important;
+            box-shadow: var(--shadow-soft) !important;
+        }
+        [data-testid="stChatInput"]:focus-within {
+            border-color: var(--primary-color) !important;
+            box-shadow: 0 0 0 3px var(--focus-ring) !important;
+        }
+        .stSelectbox label, .stSlider label, .stRadio label,
+        .stTextInput label, [data-testid="stCheckbox"] label {
+            color: var(--text-color) !important;
+        }
+        .stSelectbox [data-baseweb="select"] {
+            background-color: var(--surface-color) !important;
+            border-color: var(--border-color) !important;
+        }
+        .stSelectbox [data-baseweb="select"] * { color: var(--text-color) !important; }
+        .claude-table {
+            background-color: var(--surface-color) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 16px !important;
+        }
+        .claude-table th {
+            background-color: var(--secondary-background-color) !important;
+            color: var(--text-color) !important;
+        }
+        .claude-table td { color: var(--text-color) !important; }
+        code, pre {
+            background-color: var(--code-bg) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-color) !important;
+        }
+
+        /* Bright newspaper theme */
+        html, body, .stApp, [data-testid="stAppViewContainer"],
+        [data-testid="stMain"], [data-testid="stHeader"],
+        [data-testid="stToolbar"], [data-testid="stBottom"],
+        [data-testid="stBottom"] > div, [data-testid="stBottomBlockContainer"] {
+            background-color: var(--background-color) !important;
+            color: var(--text-color) !important;
+        }
+        html, body, .stApp, [data-testid="stAppViewContainer"] {
+            overflow-x: hidden !important;
+        }
+        .stApp {
+            background-image:
+                radial-gradient(rgba(26, 26, 26, 0.045) 0.5px, transparent 0.65px),
+                radial-gradient(rgba(26, 26, 26, 0.035) 0.4px, transparent 0.65px) !important;
+            background-size: 7px 7px, 11px 11px !important;
+        }
+        body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+            color: var(--text-color) !important;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+            font-size: 15px !important;
+            line-height: 1.6 !important;
+        }
+        h1, h2, h3, h4, h5, h6, .greeting-title, .story-title,
+        .quick-summary-title, .agent-reply-body h1, .agent-reply-body h2,
+        .agent-reply-body h3, .agent-reply-body h4 {
+            color: var(--text-color) !important;
+            font-family: 'Playfair Display', Georgia, serif !important;
+            font-weight: 600 !important;
+        }
+        .block-container h1 {
+            font-size: 2.45rem !important;
+            font-weight: 700 !important;
+            line-height: 1.2 !important;
+        }
+        .block-container h1::after,
+        .block-container h2::after, .block-container h3::after,
+        .block-container h4::after, .section-label::after,
+        .quick-summary-title::after {
+            content: "";
+            display: block;
+            width: 36px;
+            height: 2px;
+            margin-top: 7px;
+            background-color: var(--primary-color);
+        }
+        .block-container h1::after { width: 54px; margin-top: 10px; }
+        .story-title { font-size: 19px !important; line-height: 1.4 !important; }
+        .story-summary, .quick-summary-text, .agent-reply-body,
+        .agent-reply-body p, .greeting-sub {
+            color: var(--text-secondary) !important;
+            font-family: 'Inter', sans-serif !important;
+            font-size: 15px !important;
+            line-height: 1.6 !important;
+        }
+        a, .agent-reply-body a {
+            color: var(--link-color) !important;
+        }
+        [data-testid="stSidebar"] {
+            background-color: var(--secondary-background-color) !important;
+            border-right: 1px solid var(--border-color) !important;
+        }
+        .news-card, [data-testid="stVerticalBlockBorderWrapper"] {
+            background-color: #FFFFFF !important;
+            border: 1px solid var(--border-color) !important;
+            border-left: 3px solid var(--primary-color) !important;
+            border-radius: 12px !important;
+            padding: 20px !important;
+            box-shadow: var(--shadow-soft) !important;
+        }
+        .news-card:hover, [data-testid="stVerticalBlockBorderWrapper"]:hover {
+            border-color: var(--primary-color) !important;
+            box-shadow: 0 5px 14px rgba(0, 0, 0, 0.1) !important;
+            transform: translateY(-2px);
+        }
+        .badge-source, .badge-date, .badge-theme {
+            background-color: var(--secondary-background-color) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 9999px !important;
+            color: var(--text-secondary) !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.04em !important;
+            text-transform: uppercase !important;
+        }
+        .quick-summary-box {
+            background-color: var(--secondary-background-color) !important;
+            border: 1px solid var(--border-color) !important;
+            border-left: 3px solid var(--primary-color) !important;
+            border-radius: 12px !important;
+            box-shadow: var(--shadow-soft) !important;
+        }
+        .quick-summary-title { color: var(--primary-color) !important; }
+        .stTabs [data-baseweb="tab-list"] {
+            background: transparent !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+        .stTabs [data-baseweb="tab"] {
+            background: transparent !important;
+            border-radius: 0 !important;
+        }
+        .stTabs [data-baseweb="tab"] *,
+        .stTabs [data-baseweb="tab"]:not([aria-selected="true"]) * {
+            color: var(--text-secondary) !important;
+        }
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            border-bottom: 2px solid var(--primary-color) !important;
+        }
+        .stTabs [data-baseweb="tab"][aria-selected="true"] * {
+            color: var(--primary-color) !important;
+        }
+        .stButton > button[kind="primary"] {
+            background-color: var(--primary-color) !important;
+            border: 1px solid var(--primary-color) !important;
+            color: #FFFFFF !important;
+        }
+        .stButton > button[kind="primary"] * {
+            color: #FFFFFF !important;
+        }
+        .stButton > button:not([kind="primary"]),
+        .stDownloadButton > button {
+            background-color: #FFFFFF !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 12px !important;
+            color: var(--text-color) !important;
+            box-shadow: var(--shadow-soft) !important;
+        }
+        [data-testid="stPopover"] button,
+        [data-testid="stPopoverButton"],
+        button[aria-haspopup="dialog"] {
+            background-color: #FFFFFF !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-color) !important;
+            font-weight: 600 !important;
+            opacity: 1 !important;
+        }
+        [data-testid="stPopover"] button *,
+        [data-testid="stPopoverButton"] *,
+        button[aria-haspopup="dialog"] * {
+            color: var(--text-color) !important;
+            fill: var(--text-color) !important;
+            stroke: var(--text-color) !important;
+            opacity: 1 !important;
+        }
+        [data-testid="stSidebar"] .stButton > button {
+            min-height: 42px !important;
+        }
+        [data-testid="stSidebar"] div[data-testid="column"]:last-child .stButton > button:not([kind="primary"]) {
+            width: 44px !important;
+            min-width: 44px !important;
+            height: 42px !important;
+            min-height: 42px !important;
+            padding: 0 !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 12px !important;
+            background-color: #FFFFFF !important;
+            color: var(--text-color) !important;
+            font-size: 18px !important;
+            line-height: 1 !important;
+            opacity: 1 !important;
+            box-shadow: var(--shadow-soft) !important;
+        }
+        .stTextInput > div > div > input,
+        [data-testid="stChatInput"] {
+            background-color: #FFFFFF !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 16px !important;
+            color: var(--text-color) !important;
+        }
+        .stTextInput > div > div > input::placeholder,
+        [data-testid="stChatInput"] textarea::placeholder {
+            color: var(--text-secondary) !important;
+            opacity: 1 !important;
+        }
+        .stTextInput > div > div > input:focus,
+        [data-testid="stChatInput"]:focus-within {
+            border-color: var(--primary-color) !important;
+            box-shadow: 0 0 0 3px var(--focus-ring) !important;
+        }
+        [data-testid="stChatInput"] { border-radius: 999px !important; }
+        .stSelectbox label, .stSlider label, .stRadio label,
+        .stTextInput label, [data-testid="stCheckbox"] label {
+            color: var(--text-color) !important;
+        }
+        .claude-table {
+            background-color: #FFFFFF !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 12px !important;
+        }
+        .claude-table th {
+            background-color: var(--secondary-background-color) !important;
+            color: var(--text-color) !important;
+        }
+        .claude-table td { color: var(--text-color) !important; }
+        code, pre {
+            background-color: var(--secondary-background-color) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-color) !important;
+        }
+        @media (max-width: 768px) {
+            .block-container {
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+            }
+            [data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+                gap: 0.6rem !important;
+            }
+            [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+                flex: 1 1 100% !important;
+                width: 100% !important;
+                min-width: 0 !important;
+            }
+            .stTabs [data-baseweb="tab-list"] {
+                flex-wrap: wrap !important;
+                overflow-x: hidden !important;
+                gap: 2px !important;
+            }
+            .stTabs [data-baseweb="tab"] {
+                white-space: normal !important;
+                padding: 8px 10px !important;
+            }
+            .story-title { font-size: 18px !important; }
         }
     </style>
     """
@@ -808,8 +1275,6 @@ def main():
         initial_sidebar_state="expanded"
     )
 
-    inject_claude_styling()
-
     # Session state initialization
     if "current_digest" not in st.session_state:
         st.session_state["current_digest"] = None
@@ -826,11 +1291,20 @@ def main():
     if "recent_chats" not in st.session_state:
         st.session_state["recent_chats"] = []
 
+    inject_claude_styling()
+
+    if "preset_topic" in st.session_state:
+        st.session_state["search_input"] = st.session_state.pop("preset_topic")
+        st.session_state["search_box"] = st.session_state["search_input"]
+    elif not st.session_state.get("current_digest") and not st.session_state.get("search_input"):
+        st.session_state["search_box"] = ""
+    elif "search_box" not in st.session_state:
+        st.session_state["search_box"] = st.session_state.get("search_input", "")
+
     # -----------------------------------------------------------------------
-    # Left Sidebar: New chat button + Recents + Settings (Collapsible)
+    # Sidebar: New chat and recent topics
     # -----------------------------------------------------------------------
     with st.sidebar:
-        # New Chat Button
         if st.button("＋ Start new chat", use_container_width=True, type="primary"):
             st.session_state["current_digest"] = None
             st.session_state["current_topic"] = ""
@@ -840,14 +1314,12 @@ def main():
             st.rerun()
 
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
-
-        # Recents / Past Chats List Area with per-topic delete and clear-all
-        hdr_col, clr_col = st.columns([3, 1])
-        with hdr_col:
-            st.markdown("<p class='section-label' style='font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;'>Recent Chats</p>", unsafe_allow_html=True)
-        with clr_col:
-            if st.button("🗑️ All", key="clear_all_history", help="Clear all chat history"):
-                _clear_all_history()
+        st.markdown(
+            "<p class='section-label' style='font-size: 12px; font-weight: 600; "
+            "text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;'>"
+            "Recent Chats</p>",
+            unsafe_allow_html=True
+        )
 
         pm = PersistentMemory()
         history_records = pm.get_history()
@@ -864,16 +1336,16 @@ def main():
 
         if recent_topics:
             for top in recent_topics:
-                chat_col, del_col = st.columns([5, 1])
+                chat_col, del_col = st.columns([5, 0.9], gap="small")
                 with chat_col:
                     if st.button(f"💬 {top}", key=f"hist_{top}", use_container_width=True):
-                        st.session_state["search_input"] = top
+                        st.session_state["preset_topic"] = top
                         st.session_state["trigger_search"] = True
+                        st.session_state["current_digest"] = None
                         st.rerun()
                 with del_col:
-                    if st.button("✕", key=f"del_{top}", help=f"Delete '{top}' from history"):
+                    if st.button("🗑", key=f"del_{top}", help=f"Delete '{top}' from history"):
                         _delete_topic_history(top)
-                        # Clear active view if the deleted topic is currently displayed
                         if st.session_state.get("current_topic", "") == top:
                             st.session_state["current_digest"] = None
                             st.session_state["current_topic"] = ""
@@ -882,94 +1354,126 @@ def main():
         else:
             st.caption("No past chats yet.")
 
-        st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
-        st.divider()
+    has_active_chat = bool(st.session_state.get("current_digest"))
 
-        # Collapsible Engine Controls & Settings
-        with st.expander("⚙️ Engine Settings & Preferences", expanded=False):
-            mode = st.radio(
+    title_col, settings_col = st.columns([5, 1.15], vertical_alignment="center")
+    with title_col:
+        st.markdown("# News Summarizer AI")
+        st.caption("Your daily brief of clear, verified reporting.")
+    with settings_col:
+        with st.popover("⚙ Settings", use_container_width=True):
+            st.markdown("### Engine Settings & Preferences")
+            st.radio(
                 "Search & LLM Provider",
                 ["Offline Mock (Fast / Zero Token Cost)", "Live API (Tavily + LiteLLM)"],
-                index=1
+                index=1,
+                key="engine_mode"
             )
-
-            time_range = st.selectbox(
+            st.selectbox(
                 "Time Horizon",
                 ["24h", "7d", "30d"],
                 index=1,
-                help="Recent window of news coverage."
+                help="Recent window of news coverage.",
+                key="time_range"
             )
-
-            num_stories = st.slider(
+            st.slider(
                 "Story Target Count",
                 min_value=3,
                 max_value=10,
                 value=3,
-                help="Number of verified stories in final digest (PRD range: 3-10)."
+                help="Number of verified stories in final digest (PRD range: 3-10).",
+                key="num_stories"
             )
-
-            st.markdown("#### ⭐ Bookmarked Topics")
+            dark_default = False
+            try:
+                dark_default = bool(st.context.theme and st.context.theme.type == "dark")
+            except Exception:
+                pass
+            st.toggle("Dark appearance", value=dark_default, key="dark_mode_toggle")
             favorites = get_favorites()
             if favorites:
-                selected_fav = st.selectbox("Load bookmark:", ["-- Select --"] + favorites)
-                if selected_fav != "-- Select --":
-                    st.session_state["search_input"] = selected_fav
+                selected_fav = st.selectbox(
+                    "Load bookmark:",
+                    ["-- Select --"] + favorites,
+                    key="favorite_topic"
+                )
+                if selected_fav != "-- Select --" and st.button(
+                    "Search bookmarked topic",
+                    use_container_width=True
+                ):
+                    st.session_state["preset_topic"] = selected_fav
                     st.session_state["trigger_search"] = True
+                    st.rerun()
             else:
                 st.caption("No bookmarks yet.")
+            st.caption(
+                f"Guardrails · {config.max_steps} max steps · "
+                f"{config.cache_ttl_minutes}m cache · {config.default_timezone}"
+            )
 
-            st.markdown("#### 🛡️ Guardrails")
-            st.markdown(f"- Max Steps: `{config.max_steps}`")
-            st.markdown(f"- Cache TTL: `{config.cache_ttl_minutes}m`")
-            st.markdown(f"- Timezone: `{config.default_timezone}`")
-    
-    # -----------------------------------------------------------------------
-    # Main Centered Chat Column (max-width ~760px)
-    # -----------------------------------------------------------------------
-    has_active_chat = bool(st.session_state.get("current_digest"))
+    mode = st.session_state.get("engine_mode", "Live API (Tavily + LiteLLM)")
+    time_range = st.session_state.get("time_range", "7d")
+    num_stories = st.session_state.get("num_stories", 3)
 
-    # Empty State: Simple centered greeting and preset suggestions
     if not has_active_chat:
         st.markdown("""
         <div class="empty-state">
-            <div class="greeting-title">What would you like to explore?</div>
+            <div class="greeting-title">Your world, in context.</div>
             <div class="greeting-sub">
-                Autonomous factual news synthesis powered by plain Python and strict verification guardrails.
+                Explore the latest verified reporting, distilled into a clear daily briefing.
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("<p class='section-label' style='font-size: 13px; font-weight: 600; text-align: center; margin-bottom: 12px;'>Trending Presets</p>", unsafe_allow_html=True)
-        p_col1, p_col2 = st.columns(2)
-        with p_col1:
-            if st.button("🚗 Electric Vehicles in India", use_container_width=True):
-                st.session_state["search_input"] = "Electric vehicles in India"
-                st.session_state["trigger_search"] = True
-                st.rerun()
-            if st.button("🤖 Global AI Regulation 2026", use_container_width=True):
-                st.session_state["search_input"] = "Global AI Regulation 2026"
-                st.session_state["trigger_search"] = True
-                st.rerun()
-        with p_col2:
-            if st.button("⚛️ Quantum Computing Scaling", use_container_width=True):
-                st.session_state["search_input"] = "Quantum computing commercialization"
-                st.session_state["trigger_search"] = True
-                st.rerun()
-            if st.button("🔋 Solid-State Battery Patents", use_container_width=True):
-                st.session_state["search_input"] = "Solid-state lithium battery patents"
-                st.session_state["trigger_search"] = True
-                st.rerun()
+    search_left, search_center, search_right = st.columns([1, 6, 1])
+    with search_center:
+        search_col, submit_col = st.columns([5, 1.15], vertical_alignment="bottom")
+        with search_col:
+            st.text_input(
+                "Search news",
+                placeholder="Search a topic, event, or question...",
+                label_visibility="collapsed",
+                key="search_box",
+                on_change=_sync_search_input
+            )
+        with submit_col:
+            search_submitted = st.button(
+                "Explore",
+                type="primary",
+                use_container_width=True
+            )
 
-    # Fixed Bottom Chat Input
-    chat_query = st.chat_input("How can I help you research today?")
+    # Four fast-launch topics, kept compact on desktop and allowed to wrap on mobile.
+    if not has_active_chat:
+        st.markdown(
+            "<p class='section-label' style='font-size: 12px; font-weight: 600; "
+            "text-align: center; margin: 18px 0 10px;'>TRENDING</p>",
+            unsafe_allow_html=True
+        )
+        preset_columns = st.columns(4)
+        presets = [
+            ("🚗  EVs in India", "Electric vehicles in India"),
+            ("🤖  AI regulation", "Global AI Regulation 2026"),
+            ("⚛️  Quantum computing", "Quantum computing commercialization"),
+            ("🔋  Battery patents", "Solid-state lithium battery patents"),
+        ]
+        for column, (label, query) in zip(preset_columns, presets):
+            with column:
+                if st.button(label, key=f"preset_{query}", use_container_width=True):
+                    st.session_state["preset_topic"] = query
+                    st.session_state["trigger_search"] = True
+                    st.rerun()
 
-    # Check for search triggers
-    topic_to_run = None
-    if chat_query and chat_query.strip():
+    # Search submission and preset/bookmark launches share the existing search state.
+    chat_query = st.session_state.get("search_box", "")
+    st.session_state["search_input"] = chat_query
+    if search_submitted and chat_query.strip():
         topic_to_run = chat_query.strip()
-    elif st.session_state.get("trigger_search", False) and st.session_state.get("search_input", ""):
-        topic_to_run = st.session_state["search_input"].strip()
+    elif st.session_state.get("trigger_search", False) and chat_query.strip():
+        topic_to_run = chat_query.strip()
         st.session_state["trigger_search"] = False
+    else:
+        topic_to_run = None
 
     # Pipeline Execution
     if topic_to_run:
@@ -977,9 +1481,9 @@ def main():
             st.warning("⚠️ Please provide a topic with at least 2 characters.")
             return
 
-        is_mock = "Mock" in mode or not config.tavily_api_key
+        is_mock = "Mock" in mode
         if not is_mock and not config.tavily_api_key:
-            st.info("ℹ️ No TAVILY_API_KEY detected in .env; executing in offline mock mode.")
+            st.info("Live search isn't configured yet, so this briefing will use offline demo data.")
             is_mock = True
 
         llm = MockLLMClient() if is_mock else RealLLMClient()
@@ -1032,15 +1536,38 @@ def main():
             agent.tools["search_news"] = mock_search_tool
             agent.tools["extract_article"] = mock_extract_tool
 
-        with st.status(f"Synthesizing '{topic_to_run}'...", expanded=True) as status:
+        with st.status("Agent progress", expanded=True) as status:
             plan = agent.planner.create_plan(topic_to_run, num_stories, time_range)
             if plan.aborted:
                 status.update(label="⚠️ Planning Aborted", state="error", expanded=True)
-                st.error(plan.abort_reason)
+                st.warning(plan.abort_reason or "This topic could not be planned. Try a more specific search.")
                 return
 
-            st.write(f"✓ Formulated {len(plan.steps)} verified execution steps")
-            st.write("✓ Running Plain Python ReAct synthesis (`Think > Act > Look`)...")
+            class AgentProgressHandler(logging.Handler):
+                def emit(self, record):
+                    message = record.getMessage()
+                    if "[PLAN]" in message:
+                        status.write("Planning")
+                        status.update(label="Planning", state="running", expanded=True)
+                    elif "[ACT]" in message and "search_news" in message:
+                        status.write("Searching")
+                        status.update(label="Searching", state="running", expanded=True)
+                    elif "[ACT]" in message and any(
+                        action in message for action in ("extract_article", "validate_link")
+                    ):
+                        status.write("Reading")
+                        status.update(label="Reading", state="running", expanded=True)
+                    elif "[ACT]" in message and any(
+                        action in message for action in ("synthesize", "finish")
+                    ):
+                        status.write("Summarizing")
+                        status.update(label="Summarizing", state="running", expanded=True)
+                    elif "[FINISH]" in message:
+                        status.write("Complete")
+                        status.update(label="Briefing ready", state="complete", expanded=False)
+
+            progress_handler = AgentProgressHandler()
+            agent.logger._logger.addHandler(progress_handler)
 
             try:
                 digest = agent.run(
@@ -1048,11 +1575,25 @@ def main():
                     num_stories=num_stories,
                     time_range=time_range
                 )
-            except RuntimeError as error:
-                status.update(label="Synthesis failed", state="error", expanded=True)
-                st.error(f"Digest generation failed: {error}")
+            except ImportError as error:
+                status.update(label="Model unavailable", state="error", expanded=True)
+                if "litellm" in str(error).lower():
+                    st.info("The live language-model component is unavailable. Install/configure it or switch to Offline Mock in Settings.")
+                else:
+                    st.info("A required language-model component is unavailable. Check the provider settings and try again.")
                 return
-            status.update(label="✓ Synthesis complete", state="complete", expanded=False)
+            except RuntimeError as error:
+                message = str(error).lower()
+                status.update(label="Briefing unavailable", state="error", expanded=True)
+                if any(term in message for term in ("rate limit", "rate_limit", "ratelimit", "429", "too many requests")):
+                    st.warning("The news provider is rate-limiting requests. Please wait a moment and try again.")
+                elif any(term in message for term in ("ollama", "localhost:11434", "connection refused")):
+                    st.info("The local language model appears to be offline. Start it or switch to Offline Mock in Settings.")
+                else:
+                    st.error("The news service couldn't complete this briefing. Please try again shortly.")
+                return
+            finally:
+                agent.logger._logger.removeHandler(progress_handler)
 
         st.session_state["current_digest"] = digest
         st.session_state["current_topic"] = topic_to_run
@@ -1067,17 +1608,13 @@ def main():
         topic_disp = st.session_state["current_topic"]
         digest_text = st.session_state["current_digest"]
 
-        # 1. USER MESSAGE BUBBLE (Right-aligned, soft rounded bubble)
         st.markdown(f"""
         <div class="user-msg-container">
             <div class="user-msg-bubble">
-                Research {topic_disp}
+                Research {html.escape(topic_disp)}
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-        # 2. AGENT REPLY (Plain text directly on page with NO bubble, clean typography)
-        st.markdown('<div class="agent-reply-body">', unsafe_allow_html=True)
 
         # Executive Overview Box
         quick_sum = ""
@@ -1094,7 +1631,7 @@ def main():
                     Executive Overview
                 </div>
                 <div class="quick-summary-text">
-                    {quick_sum}
+                    {html.escape(quick_sum)}
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1109,47 +1646,34 @@ def main():
 
         # Tab 1: Stories
         with tab_studio:
-            if "Key stories:" in digest_text:
-                raw_stories_block = digest_text.split("Key stories:")[1].split("Based on")[0].strip()
-                story_blocks = raw_stories_block.split("\n\n")
-
-                for block in story_blocks:
-                    lines = [l.strip() for l in block.splitlines() if l.strip()]
-                    if not lines:
-                        continue
-
-                    title = lines[0]
-                    summary_lines = []
-                    source_str = "Verified Source"
-                    date_str = "Recent"
-                    url_str = "#"
-
-                    for l in lines[1:]:
-                        if l.startswith("Source:"):
-                            source_meta = l.replace("Source:", "").strip().split("|")
-                            source_str = source_meta[0].strip() if len(source_meta) > 0 else "Source"
-                            date_str = source_meta[1].strip() if len(source_meta) > 1 else "Recent"
-                            url_str = source_meta[2].strip() if len(source_meta) > 2 else "#"
-                        else:
-                            summary_lines.append(l)
-
-                    summary_body = " ".join(summary_lines)
-
-                    st.markdown(f"""
-                    <div class="news-card">
-                        <div style="margin-bottom: 6px;">
-                            <span class="badge-source">{source_str}</span>
-                            <span class="badge-date">{date_str}</span>
-                        </div>
-                        <div class="story-title">{title}</div>
-                        <div class="story-summary">{summary_body}</div>
-                        <div style="margin-top: 12px;">
-                            <a href="{url_str}" target="_blank" style="text-decoration: none; font-size: 13px; font-weight: 500; color: var(--accent);">
-                                Read Original Article &rarr;
-                            </a>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+            digest_stories = _parse_digest_stories(digest_text)
+            if digest_stories:
+                for start in range(0, len(digest_stories), 2):
+                    story_columns = st.columns(2, gap="medium")
+                    for column, story in zip(story_columns, digest_stories[start:start + 2]):
+                        with column:
+                            with st.container(border=True):
+                                source = html.escape(str(story.get("source", "Verified Source")))
+                                published = html.escape(str(story.get("published_date", "Recent")))
+                                title = html.escape(str(story.get("title", "Untitled story")))
+                                summary = html.escape(str(story.get("summary", "")))
+                                st.markdown(
+                                    f'<span class="badge-source">{source}</span>'
+                                    f'<span class="badge-date">{published}</span>',
+                                    unsafe_allow_html=True
+                                )
+                                st.markdown(
+                                    f'<div class="story-title">{title}</div>'
+                                    f'<div class="story-summary">{summary}</div>',
+                                    unsafe_allow_html=True
+                                )
+                                article_url = str(story.get("url", "")).strip()
+                                if article_url.startswith(("https://", "http://")):
+                                    st.link_button("Read article ↗", article_url)
+                                else:
+                                    st.caption("Article link unavailable.")
+            else:
+                st.info("No verified stories were available for this briefing. Try a broader topic or a longer time range.")
 
             with st.expander("View Full Markdown Digest"):
                 st.code(digest_text, language="markdown")
@@ -1169,48 +1693,32 @@ def main():
         # Tab 2: Themed Insights
         with tab_themed:
             st.markdown("#### Thematic Categorization")
-            sample_stories_for_theming = [
-                {
-                    "title": f"Recent Technological Progress in {topic_disp}",
-                    "summary": "Engineering teams and research consortiums filed key patents and reached high efficiency milestones.",
-                    "source": "verified-news.com",
-                    "published_date": "2026-11-09",
-                    "url": "https://verified-news.com/tech"
-                },
-                {
-                    "title": f"Legislative Standards and Regulatory Mandates on {topic_disp}",
-                    "summary": "Government oversight committee passed new guidelines and safety compliance rules.",
-                    "source": "policymonitor.org",
-                    "published_date": "2026-11-10",
-                    "url": "https://policymonitor.org/policy"
-                },
-                {
-                    "title": f"Market Capitalization & Venture Investment Surge for {topic_disp}",
-                    "summary": "Investors poured venture capital into leading startups as commercial deliveries ramp up.",
-                    "source": "tech-monitor.org",
-                    "published_date": "2026-11-10",
-                    "url": "https://tech-monitor.org/business"
-                }
-            ]
-
-            themed_clusters = group_stories_by_theme(sample_stories_for_theming)
-            for theme_name, theme_list in themed_clusters.items():
-                st.markdown(f"**{theme_name}**")
-                for s in theme_list:
-                    st.markdown(f"""
-                    <div class="news-card">
-                        <span class="badge-theme">{theme_name}</span>
-                        <div class="story-title">{s['title']}</div>
-                        <div class="story-summary">{s['summary']}</div>
-                        <div style="font-size: 13px; color: var(--text-secondary); margin-top: 8px;">Source: {s['source']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+            if digest_stories:
+                themed_clusters = group_stories_by_theme(digest_stories)
+                for theme_name, theme_list in themed_clusters.items():
+                    st.markdown(f"**{html.escape(str(theme_name))}**")
+                    for story in theme_list:
+                        st.markdown(f"""
+                        <div class="news-card">
+                            <span class="badge-theme">{html.escape(str(theme_name))}</span>
+                            <div class="story-title">{html.escape(str(story.get('title', 'Untitled story')))}</div>
+                            <div class="story-summary">{html.escape(str(story.get('summary', '')))}</div>
+                            <div style="font-size: 13px; color: var(--text-secondary); margin-top: 8px;">
+                                Source: {html.escape(str(story.get('source', 'Verified Source')))}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("Themed insights will appear when verified stories are available.")
 
             st.markdown("<hr style='border: none; border-top: 1px solid var(--border-color); margin: 20px 0;'>", unsafe_allow_html=True)
             st.markdown("#### Cross-Outlet Tone & Framing Analysis")
-            outlet_analysis = compare_outlet_coverage(sample_stories_for_theming)
-            report_md = format_cross_outlet_report(outlet_analysis)
-            st.markdown(report_md)
+            if digest_stories:
+                outlet_analysis = compare_outlet_coverage(digest_stories)
+                report_md = format_cross_outlet_report(outlet_analysis)
+                st.markdown(report_md)
+            else:
+                st.caption("Outlet analysis will appear when multiple verified stories are available.")
 
         # Tab 3: Grounded Follow-up Q&A
         with tab_qa:
@@ -1239,10 +1747,10 @@ def main():
                     st.markdown(f"""
                     <div class="news-card" style="border-left: 3px solid var(--accent);">
                         <div style="font-weight: 600; font-size: 14.5px; margin-bottom: 8px; color: var(--accent);">Grounded Answer</div>
-                        <div style="font-size: 15px; line-height: 1.6; color: var(--text-primary);">{qa_result['answer']}</div>
+                        <div style="font-size: 15px; line-height: 1.6; color: var(--text-primary);">{html.escape(str(qa_result['answer']))}</div>
                         <div style="font-size: 13px; color: var(--text-secondary); margin-top: 10px;">
-                            Confidence: <strong>{qa_result['confidence'].title()}</strong> &bull; 
-                            Cited: <strong>{', '.join(qa_result['cited_sources']) if qa_result['cited_sources'] else 'None'}</strong>
+                            Confidence: <strong>{html.escape(str(qa_result['confidence']).title())}</strong> &bull; 
+                            Cited: <strong>{html.escape(', '.join(qa_result['cited_sources']) if qa_result['cited_sources'] else 'None')}</strong>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -1338,7 +1846,6 @@ def main():
                 use_container_width=True
             )
 
-        st.markdown('</div>', unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
