@@ -221,8 +221,6 @@ def inject_claude_styling():
 
     css = """
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
-
         :root {
             --background-color: __background_color__;
             --secondary-background-color: __secondary_background_color__;
@@ -1256,6 +1254,114 @@ def inject_claude_styling():
                 padding: 8px 10px !important;
             }
             .story-title { font-size: 18px !important; }
+        }
+
+        /* Repeating newspaper texture; the cream wash keeps it low contrast. */
+        .stApp, [data-testid="stAppViewContainer"] {
+            background-color: var(--background-color) !important;
+            background-image:
+                linear-gradient(rgba(251, 248, 243, 0.86), rgba(251, 248, 243, 0.86)),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch' result='noise'/%3E%3CfeColorMatrix in='noise' type='matrix' values='0%200%200%200%200.36%200%200%200%200%200.31%200%200%200%200%200.26%200.2%200%200%200%200'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23grain)'/%3E%3C/svg%3E"),
+                repeating-linear-gradient(
+                    to bottom,
+                    transparent 0,
+                    transparent 9px,
+                    rgba(60, 50, 40, 0.07) 9px,
+                    rgba(60, 50, 40, 0.07) 10px
+                ),
+                repeating-linear-gradient(
+                    to right,
+                    transparent 0,
+                    transparent 239px,
+                    rgba(60, 50, 40, 0.09) 239px,
+                    rgba(60, 50, 40, 0.09) 240px
+                ) !important;
+            background-repeat: repeat !important;
+            background-size: auto, 200px 200px, auto, auto !important;
+            background-attachment: fixed !important;
+        }
+        [data-testid="stMain"] {
+            background-color: transparent !important;
+            background-image: none !important;
+        }
+        [data-testid="stHeader"], [data-testid="stToolbar"],
+        [data-testid="stBottom"], [data-testid="stBottom"] > div,
+        [data-testid="stBottomBlockContainer"] {
+            background-color: var(--background-color) !important;
+            background-image: none !important;
+        }
+        .news-card, [data-testid="stVerticalBlockBorderWrapper"],
+        .stTextInput > div > div > input, [data-testid="stChatInput"],
+        .stTabs, .stTabs [data-baseweb="tab-list"],
+        .stTabs [data-baseweb="tab"], .stButton > button,
+        .stDownloadButton > button, [data-testid="stPopover"],
+        [data-testid="stPopover"] button, .claude-table {
+            background-image: none !important;
+        }
+        .news-card, [data-testid="stVerticalBlockBorderWrapper"] {
+            background-color: #FFFFFF !important;
+        }
+        .quick-summary-box {
+            background-color: var(--secondary-background-color) !important;
+            background-image: none !important;
+        }
+        [data-testid="stSidebar"] {
+            background-color: var(--secondary-background-color) !important;
+            background-image: none !important;
+        }
+        .stTextInput > div > div > input, [data-testid="stChatInput"] {
+            background-color: #FFFFFF !important;
+        }
+        .stTabs, .stTabs [data-baseweb="tab-list"],
+        .stTabs [data-baseweb="tab"] {
+            background-color: var(--background-color) !important;
+        }
+        .stButton > button:not([kind="primary"]),
+        .stDownloadButton > button,
+        [data-testid="stPopover"] button,
+        button[aria-haspopup="dialog"] {
+            background-color: #FFFFFF !important;
+            color: var(--text-color) !important;
+            border: 1px solid var(--border-color) !important;
+        }
+        .stButton > button[kind="primary"] {
+            background-color: var(--primary-color) !important;
+            color: #FFFFFF !important;
+        }
+        [data-testid="stPopover"] button *,
+        button[aria-haspopup="dialog"] * {
+            color: var(--text-color) !important;
+            fill: var(--text-color) !important;
+            stroke: var(--text-color) !important;
+            opacity: 1 !important;
+        }
+        [data-testid="stSidebar"] .stButton > button,
+        [data-testid="stSidebar"] div[data-testid="column"]:last-child .stButton > button:not([kind="primary"]) {
+            height: 42px !important;
+            min-height: 42px !important;
+        }
+        [data-testid="stSidebar"] div[data-testid="column"]:last-child .stButton > button:not([kind="primary"]) {
+            color: var(--text-color) !important;
+            font-size: 18px !important;
+            opacity: 1 !important;
+        }
+        @media (max-width: 768px) {
+            html, body, .stApp, [data-testid="stAppViewContainer"] {
+                overflow-x: hidden !important;
+            }
+            [data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+                gap: 0.6rem !important;
+            }
+            [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+                flex: 1 1 100% !important;
+                width: 100% !important;
+                min-width: 0 !important;
+            }
+            .stTabs [data-baseweb="tab-list"] {
+                flex-wrap: wrap !important;
+                overflow-x: hidden !important;
+            }
         }
     </style>
     """
